@@ -9,25 +9,34 @@ To use: fire up ocaml and then
 (* Start with Ackermann's function: *)
 
 let rec ack (x, y) =
-  if x = 0 then y + 1
-  else if y = 0 then ack (x - 1, 1)
-  else ack (x - 1, ack (x, y - 1))
+  if x = 0 then
+    y + 1
+  else if y = 0 then
+    ack (x - 1, 1)
+  else
+    ack (x - 1, ack (x, y - 1))
 
 (* Use CPS transformation *)
 
 let rec ack_cps (x, y, cnt) =
-  if x = 0 then cnt (y + 1)
-  else if y = 0 then ack_cps (x - 1, 1, cnt)
-  else ack_cps (x, y - 1, fun a -> ack_cps (x - 1, a, cnt))
+  if x = 0 then
+    cnt (y + 1)
+  else if y = 0 then
+    ack_cps (x - 1, 1, cnt)
+  else
+    ack_cps (x, y - 1, fun a -> ack_cps (x - 1, a, cnt))
 
 let ack_2 (x, y) = ack_cps (x, y, fun x -> x)
 
 (* Now "defunctionalise" and represent continuations as lists  *)
 
 let rec ack_cps_dfc (x, y, cnt) =
-  if x = 0 then apply_cnt (cnt, y + 1)
-  else if y = 0 then ack_cps_dfc (x - 1, 1, cnt)
-  else ack_cps_dfc (x, y - 1, x :: cnt)
+  if x = 0 then
+    apply_cnt (cnt, y + 1)
+  else if y = 0 then
+    ack_cps_dfc (x - 1, 1, cnt)
+  else
+    ack_cps_dfc (x, y - 1, x :: cnt)
 
 and apply_cnt = function
   | [], x -> x

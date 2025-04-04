@@ -10,7 +10,12 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
    This is a tail-recursive function.
 *)
 let rec gcd (m, n) =
-  if m = n then m else if m < n then gcd (m, n - m) else gcd (m - n, n)
+  if m = n then
+    m
+  else if m < n then
+    gcd (m, n - m)
+  else
+    gcd (m - n, n)
 
 let l1 = List.map gcd [ (24, 638); (17, 289); (31, 1889) ]
 
@@ -32,8 +37,10 @@ let gcd_iter (m, n) =
       if !rm = !rn then (
         not_done := false;
         result := !rm)
-      else if !rm < !rn then rn := !rn - !rm
-      else rm := !rm - !rn
+      else if !rm < !rn then
+        rn := !rn - !rm
+      else
+        rm := !rm - !rn
     done
   in
   !result
@@ -42,7 +49,8 @@ let l2 = List.map gcd_iter [ (24, 638); (17, 289); (31, 1889) ]
 
 (* Here is the mother of all tail-recurive functions *)
 let rec my_while (test, body) () =
-  if test () then my_while (test, body) (body ())
+  if test () then
+    my_while (test, body) (body ())
 
 (* we can eliminate recursion with iteration! *)
 let my_while_iter (test, body) () =

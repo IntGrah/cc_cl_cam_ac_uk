@@ -30,22 +30,32 @@
    fib : int -> int
 *)
 let rec fib m =
-  if m = 0 then 1 else if m = 1 then 1 else fib (m - 1) + fib (m - 2)
+  if m = 0 then
+    1
+  else if m = 1 then
+    1
+  else
+    fib (m - 1) + fib (m - 2)
 
 (* Now, apply cps transform.
 
    fib_cps : (int *(int -> int)) -> int
 *)
 let rec fib_cps (m, cnt) =
-  if m = 0 then cnt 1
-  else if m = 1 then cnt 1
-  else fib_cps (m - 1, fun a -> fib_cps (m - 2, fun b -> cnt (a + b)))
+  if m = 0 then
+    cnt 1
+  else if m = 1 then
+    cnt 1
+  else
+    fib_cps (m - 1, fun a -> fib_cps (m - 2, fun b -> cnt (a + b)))
 
 (* Here is a version using lets, not "lambdas"
 *)
 let rec fib_cps_v2 (m, cnt) =
-  if m = 0 then cnt 1
-  else if m = 1 then cnt 1
+  if m = 0 then
+    cnt 1
+  else if m = 1 then
+    cnt 1
   else
     let cnt2 a b = cnt (a + b) in
     let cnt1 a = fib_cps_v2 (m - 2, cnt2 a) in
@@ -70,9 +80,12 @@ let rec apply_cnt = function
 
 (*  fib_cps_dfc : (cnt * int) -> int *)
 and fib_cps_dfc (m, cnt) =
-  if m = 0 then apply_cnt (cnt, 1)
-  else if m = 1 then apply_cnt (cnt, 1)
-  else fib_cps_dfc (m - 1, CNT1 (m, cnt))
+  if m = 0 then
+    apply_cnt (cnt, 1)
+  else if m = 1 then
+    apply_cnt (cnt, 1)
+  else
+    fib_cps_dfc (m - 1, CNT1 (m, cnt))
 
 (*  fib_2 : int -> int *)
 let fib_2 m = fib_cps_dfc (m, ID)
@@ -95,9 +108,12 @@ let rec apply_tag_list_cnt = function
 
 (* fib_cps_dfc_tags : (tag_list_cnt * int) -> int *)
 and fib_cps_dfc_tags (m, cnt) =
-  if m = 0 then apply_tag_list_cnt (cnt, 1)
-  else if m = 1 then apply_tag_list_cnt (cnt, 1)
-  else fib_cps_dfc_tags (m - 1, SUB2 m :: cnt)
+  if m = 0 then
+    apply_tag_list_cnt (cnt, 1)
+  else if m = 1 then
+    apply_tag_list_cnt (cnt, 1)
+  else
+    fib_cps_dfc_tags (m - 1, SUB2 m :: cnt)
 
 (*  fib_3 : int -> int *)
 let fib_3 m = fib_cps_dfc_tags (m, [])
@@ -188,7 +204,8 @@ let verbose = ref true
 
 *)
 let rec eval_steps n state =
-  if !verbose then print_state n state;
+  if !verbose then
+    print_state n state;
   match state with APPL, a, [] -> a | _ -> eval_steps (n + 1) (step state)
 
 (*  fib_5 : int -> int *)
