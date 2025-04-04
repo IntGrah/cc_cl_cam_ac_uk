@@ -7,33 +7,33 @@ Computer Laboratory
 University of Cambridge
 Timothy G. Griffin (tgg22@cam.ac.uk)
 
-This file contains a VERY simple translation of Jargon to x86 assembler. 
-The generated code attempts to closely mimic the Jargon virtual machine. 
-Calling slang with the -i4x86 option and file foo.slang  will generate 
-a foo.s file of assembler (with comments!), and a compiled version 
+This file contains a VERY simple translation of Jargon to x86 assembler.
+The generated code attempts to closely mimic the Jargon virtual machine.
+Calling slang with the -i4x86 option and file foo.slang  will generate
+a foo.s file of assembler (with comments!), and a compiled version
 "foo" that you can run from the command line (foo.s is compiled and
-linked with the runtime system (runtime/c_runtime.c). 
+linked with the runtime system (runtime/c_runtime.c).
 
-Thanks for help from Nathan Corbyn who implemented 
-rusty_slang here https://github.com/doctorn/rusty_slang. 
+Thanks for help from Nathan Corbyn who implemented
+rusty_slang here https://github.com/doctorn/rusty_slang.
 
-A few comments on the code below: 
+A few comments on the code below:
 
--- No optimisations have been implemented. 
--- No garbage collection is implemented. Heap allocated 
-   records do not yet have headers. 
--- runtime system only prints out integers correctly. 
-   This is related to having no headers. Discuss. 
--- the scratch register %r11 is used to hold a pointer to 
-   the heap, which is passed in by the runtime system. 
--- register %rax is being used for scratch, not really as an accumulator. 
+-- No optimisations have been implemented.
+-- No garbage collection is implemented. Heap allocated
+   records do not yet have headers.
+-- runtime system only prints out integers correctly.
+   This is related to having no headers. Discuss.
+-- the scratch register %r11 is used to hold a pointer to
+   the heap, which is passed in by the runtime system.
+-- register %rax is being used for scratch, not really as an accumulator.
 -- Close inspection of generated code will reveal why it would be good idea
-   to use %rax as an accumulator. That is, always have to top-of-stack in %rax. 
--- The only function calls/returns that follow the C calling 
+   to use %rax as an accumulator. That is, always have to top-of-stack in %rax.
+-- The only function calls/returns that follow the C calling
    conventions are those that interact with the runtime system
-   (the "alloc" function is called to allocate records on the heap, 
+   (the "alloc" function is called to allocate records on the heap,
    and the main function "giria" is called from the runtime system).
--- "giria" means "slang" in Portuguese. 
+-- "giria" means "slang" in Portuguese.
 
  *****************************************)
 let complain = Errors.complain
@@ -48,8 +48,8 @@ let emit_x86 e =
     output_string out_chan ("\t" ^ c ^ "\n")
     (* It would be nice to print source locations next to each line.
 		   Exercise: pass the location data while maintaining a semblence
-			 of polymorphism. 
-			 
+			 of polymorphism.
+			
 			 *cough* typeclasses *cough*
 		*)
   in

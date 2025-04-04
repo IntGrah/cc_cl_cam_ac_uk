@@ -1,4 +1,4 @@
 
-(* test subtraction *) 
+(* test subtraction *)
 
-102 - 1 
+102 - 1

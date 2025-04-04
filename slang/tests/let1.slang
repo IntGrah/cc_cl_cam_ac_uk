@@ -1,6 +1,6 @@
 let x : int = 1
-in   (let x : int = 88 
-      in 
-        x + 12 
-      ) 
-   + x 
+in   (let x : int = 88
+      in
+        x + 12
+      )
+   + x

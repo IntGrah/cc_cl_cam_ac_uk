@@ -1,34 +1,34 @@
 (**************************************
-Compiler Construction 2020 
-Computer Laboratory 
-University of Cambridge 
-Timothy G. Griffin (tgg22@cam.ac.uk) 
+Compiler Construction 2020
+Computer Laboratory
+University of Cambridge
+Timothy G. Griffin (tgg22@cam.ac.uk)
 *****************************************)
 
-(* This file derives a simple expression compiler from 
-   a recursive evaluation function.  This is done in 
+(* This file derives a simple expression compiler from
+   a recursive evaluation function.  This is done in
    small steps where each step is a simple transformation
-   easily seen (or proved) to be correct. 
+   easily seen (or proved) to be correct.
 
-   In the OCaml read-eval-print loop (repl) do this to 
-   load the file: 
+   In the OCaml read-eval-print loop (repl) do this to
+   load the file:
 
-     #use "expr_machine.ml";; 
+     #use "expr_machine.ml";;
 
-   ROAD MAP: 
+   ROAD MAP:
 
-   1) eval   : a simple recursive evaluator 
-   2) eval_2 : a cps-transformed version of eval (now tail-recursive) 
-   3) eval_3 : a defunctionalized version of eval_2 (introduces apply_2) 
-   4) eval_4 : EUREKA : a continuation can be represented as a list (used like a stack) 
-   5) eval_5 : combine apply_4 and eval_aux_4 into a two-state machine 
-   6) eval_6 : a tricky part : split stack into two : directive stack and value stack 
-   7) eval_7 : another tricky part: re-factor. instead of inspection of expressions on the 
-               stack, do the inspection before running. That is, *compile* the expression into 
-               instructions so that eval_6 e = eval_7 (compile e). 
+   1) eval   : a simple recursive evaluator
+   2) eval_2 : a cps-transformed version of eval (now tail-recursive)
+   3) eval_3 : a defunctionalized version of eval_2 (introduces apply_2)
+   4) eval_4 : EUREKA : a continuation can be represented as a list (used like a stack)
+   5) eval_5 : combine apply_4 and eval_aux_4 into a two-state machine
+   6) eval_6 : a tricky part : split stack into two : directive stack and value stack
+   7) eval_7 : another tricky part: re-factor. instead of inspection of expressions on the
+               stack, do the inspection before running. That is, *compile* the expression into
+               instructions so that eval_6 e = eval_7 (compile e).
 
-   Note: this improves on an earlier version by including a 
-   more detailed description of the transformations eval_5 --> eval_6 --> eval_7. 
+   Note: this improves on an earlier version by including a
+   more detailed description of the transformations eval_5 --> eval_6 --> eval_7.
 *)
 
 (* for use below *)
@@ -43,9 +43,9 @@ let string_of_list f l =
   in
   "[" ^ aux f l ^ "]"
 
-(* Datatype for expression 
- 
-  For example, "2 + ((5 -1) * 4)"  is represented by 
+(* Datatype for expression
+
+  For example, "2 + ((5 -1) * 4)"  is represented by
 
   PLUS(INT 2, MULT(SUBT(INT 5, INT 1), INT 4))
 
@@ -72,13 +72,13 @@ let rec string_of_expr = function
 
 (******************************* eval **************************************)
 
-(* eval : expr -> int 
-   a simple recursive evaluator for expressions. 
+(* eval : expr -> int
+   a simple recursive evaluator for expressions.
 
-   This is a very simple version of our interpreter_0. 
+   This is a very simple version of our interpreter_0.
 
-   Claim 1 : This interpreter (eval) is correct! 
-   Proof: by inspection ;-) 
+   Claim 1 : This interpreter (eval) is correct!
+   Proof: by inspection ;-)
 *)
 let rec eval = function
   | INT a -> a
@@ -104,9 +104,9 @@ let rec eval_aux_2 (e, cnt) =
   | MULT (e1, e2) ->
       eval_aux_2 (e1, fun v1 -> eval_aux_2 (e2, fun v2 -> cnt (v1 * v2)))
 
-(* 
-    Claim 2 : c (eval e) = eval_aux_2(e, c) 
-    Proof: by induction on the structure of e.  
+(*
+    Claim 2 : c (eval e) = eval_aux_2(e, c)
+    Proof: by induction on the structure of e.
 *)
 
 (* id_cnt : cnt_2 *)
@@ -117,16 +117,16 @@ let eval_2 e = eval_aux_2 (e, id_cnt)
 
 (******************************* eval_3 **************************************)
 
-(* Now apply "defunctionalisation" to eval_cps. 
+(* Now apply "defunctionalisation" to eval_cps.
 
-  Represent each c : cnt_2 as < c > : cnt_3 
+  Represent each c : cnt_2 as < c > : cnt_3
 
-  For example 
+  For example
 
-  < fun v1 -> eval_aux_2(e2, fun v2 -> cnt(v1 + v2)) >  
+  < fun v1 -> eval_aux_2(e2, fun v2 -> cnt(v1 + v2)) >
       = OUTER_PLUS(e2, < fun v2 -> cnt(v1 + v2) >)
 
-  < fun v2 -> cnt(v1 + v2) > 
+  < fun v2 -> cnt(v1 + v2) >
        = INNER_PLUS(v1, < cnt >)
 
 *)
@@ -141,11 +141,11 @@ type cnt_3 =
 
 type state_3 = expr * cnt_3
 
-(* apply_3 : cnt_3 * int -> int 
+(* apply_3 : cnt_3 * int -> int
 
-   Claim 3 : For c : cnt_2 and v : int,  c(v) = apply_3(< c >, v) AND 
-             for all e, c, eval_aux_2 (e, c) =  eval_aux_3 (e, < c >). 
-   Proof : by induction on the structure of < c >. 
+   Claim 3 : For c : cnt_2 and v : int,  c(v) = apply_3(< c >, v) AND
+             for all e, c, eval_aux_2 (e, c) =  eval_aux_3 (e, < c >).
+   Proof : by induction on the structure of < c >.
 *)
 let rec apply_3 = function
   | ID, v -> v
@@ -156,7 +156,7 @@ let rec apply_3 = function
   | INNER_SUBT (v1, cnt), v2 -> apply_3 (cnt, v1 - v2)
   | INNER_MULT (v1, cnt), v2 -> apply_3 (cnt, v1 * v2)
 
-(* eval_aux_2 : state_3 -> int 
+(* eval_aux_2 : state_3 -> int
 *)
 and eval_aux_3 (e, cnt) =
   match e with
@@ -170,17 +170,17 @@ let eval_3 e = eval_aux_3 (e, ID)
 
 (******************************* eval_4 **************************************)
 
-(* The cnt_3 type can be thought of as a list containing six 
-   kinds of elements (being used by the code like a push/pop stack). 
+(* The cnt_3 type can be thought of as a list containing six
+   kinds of elements (being used by the code like a push/pop stack).
    So let's make that explicit.
 
    If c : cnt_3, then we represent it as < c > : cnt_4 as
- 
-   < ID >  = [] 
-   < OUTER_OP(e, cnt) > = O_OP(e) :: < cnt > 
-   < INNER_OP(e, cnt) > = I_OP(e) :: < cnt > 
 
-   for OP in {PLUS, SUBT, MULT} 
+   < ID >  = []
+   < OUTER_OP(e, cnt) > = O_OP(e) :: < cnt >
+   < INNER_OP(e, cnt) > = I_OP(e) :: < cnt >
+
+   for OP in {PLUS, SUBT, MULT}
 *)
 
 type tag =
@@ -202,12 +202,12 @@ let string_of_tag = function
 type cnt_4 = tag list
 type state_4 = expr * cnt_4
 
-(* apply_4 : cnt_4 * int -> int 
+(* apply_4 : cnt_4 * int -> int
 
-   Claim 4 : For all e, c 
-             (1) for all v, apply_3(c, v)  = apply_4(< c >, v) and 
-             (2) eval_aux_3 (e, c) =  eval_aux_4 (e, < c >). 
-   Proof : by induction on the structure of e and c. 
+   Claim 4 : For all e, c
+             (1) for all v, apply_3(c, v)  = apply_4(< c >, v) and
+             (2) eval_aux_3 (e, c) =  eval_aux_4 (e, < c >).
+   Proof : by induction on the structure of e and c.
 *)
 let rec apply_4 = function
   | [], v -> v
@@ -218,7 +218,7 @@ let rec apply_4 = function
   | I_SUBT v1 :: cnt, v2 -> apply_4 (cnt, v1 - v2)
   | I_MULT v1 :: cnt, v2 -> apply_4 (cnt, v1 * v2)
 
-(* eval_aux_4 : state_4 -> int 
+(* eval_aux_4 : state_4 -> int
 *)
 and eval_aux_4 (e, cnt) =
   match e with
@@ -232,15 +232,15 @@ let eval_4 e = eval_aux_4 (e, [])
 
 (******************************* eval_5 **************************************)
 
-(* Eliminate mutual tail recursion 
+(* Eliminate mutual tail recursion
 
-   Note that apply_4 and are mutually recursive with types 
+   Note that apply_4 and are mutually recursive with types
 
    apply_4    : cnt_4 * int -> int
-   eval_aux_4 : expr * cnt_4 -> int  
+   eval_aux_4 : expr * cnt_4 -> int
 
-   We can always combine such functions int a single recursive function 
-   by "tagging" the two inputs. 
+   We can always combine such functions int a single recursive function
+   by "tagging" the two inputs.
 
 *)
 type state_5 =
@@ -272,13 +272,13 @@ let step_5 = function
   | APPLY (I_MULT v1 :: cnt, v2) -> APPLY (cnt, v1 * v2)
   | APPLY ([], v) -> APPLY ([], v)
 
-(* driver : state_5 -> int 
-   This is clearly TAIL RECURSIVE! 
+(* driver : state_5 -> int
+   This is clearly TAIL RECURSIVE!
 
-   Claim.5 : (ignoring first argument that counts steps) 
-      driver_5 (APPLY(c, m)) = apply_4(c, m) 
+   Claim.5 : (ignoring first argument that counts steps)
+      driver_5 (APPLY(c, m)) = apply_4(c, m)
       driver_5 (EVAL(c, e))  = eval_aux_4 (e, c)
-   Proof : induction on e and c. 
+   Proof : induction on e and c.
 
 *)
 let rec driver_5 n state =
@@ -290,13 +290,13 @@ let eval_5 e = driver_5 1 (EVAL ([], e))
 
 (******************************* eval_6 **************************************)
 
-(* 
-  Now for a tricky part! 
+(*
+  Now for a tricky part!
 
-  On close inspection, the continuations in state_5 actually interleave 
-  two distinct stacks --- one for "directives" (expressions and instructions) 
-  and the other for integer values.  Call the first the "directive stack" 
-  and the second the "value stack". 
+  On close inspection, the continuations in state_5 actually interleave
+  two distinct stacks --- one for "directives" (expressions and instructions)
+  and the other for integer values.  Call the first the "directive stack"
+  and the second the "value stack".
 *)
 
 type directive = E of expr | DO_PLUS | DO_SUBT | DO_MULT
@@ -304,37 +304,37 @@ type directive_stack = directive list
 type value_stack = int list
 type state_6 = directive_stack * value_stack
 
-(* 
-   state_6 states have the form (DS, VS), where DS is a directive stack 
-   and VS is a value stack 
+(*
+   state_6 states have the form (DS, VS), where DS is a directive stack
+   and VS is a value stack
 
-   How are we going to state correctness? We need a translation 
-   T :state_5 -> state_6 so that 
-   
-   Claim 6.1 : Suppose S1, S2 :state_5, then 
-      if S1 --step_5-->+ S2, then  T(S1) --step_6-->* T(S2). 
+   How are we going to state correctness? We need a translation
+   T :state_5 -> state_6 so that
 
-      Here "S1 --step_5-->+ S2" means one or more step_5 steps from S1 to S2, 
+   Claim 6.1 : Suppose S1, S2 :state_5, then
+      if S1 --step_5-->+ S2, then  T(S1) --step_6-->* T(S2).
+
+      Here "S1 --step_5-->+ S2" means one or more step_5 steps from S1 to S2,
       and "T(S1) --step_6-->* T(S2)" means zero or more step_6 steps from T(S1) to T(S2).
-  
-   On inspection of the traces (see below) we can derive the T as follows. 
+
+   On inspection of the traces (see below) we can derive the T as follows.
 
 
-   T(EVAL(c, e))              = ((E e) :: DS(c),  VS(c)) 
+   T(EVAL(c, e))              = ((E e) :: DS(c),  VS(c))
 
-   T(APPLY((I_OP n) :: c, m)) = (DO_OP :: DS(c),  m :: n :: VS(c)) 
-   T(APPLY(c, m))             = (DS(c),  [m] )                   (if no I_OP in c) 
-                              = ((E (INT m)) :: DS(c),  VS(c))   (otherwise) 
- 
-   DS([]) = [] 
-   DS((O_OP e) :: c) = [E(e); DO_OP] @ DS(c) 
-   DS((I_OP n) :: c) = DO_OP :: DS(c) 
+   T(APPLY((I_OP n) :: c, m)) = (DO_OP :: DS(c),  m :: n :: VS(c))
+   T(APPLY(c, m))             = (DS(c),  [m] )                   (if no I_OP in c)
+                              = ((E (INT m)) :: DS(c),  VS(c))   (otherwise)
 
-   VS([]) = [] 
-   VS((I_OP n) :: c) = n :: VS(c) 
-   VS((O_OP e) :: c) = VS(c) 
+   DS([]) = []
+   DS((O_OP e) :: c) = [E(e); DO_OP] @ DS(c)
+   DS((I_OP n) :: c) = DO_OP :: DS(c)
 
-   Proof of Claim 6.1. Look at each step_5 step and do a case analysis ... 
+   VS([]) = []
+   VS((I_OP n) :: c) = n :: VS(c)
+   VS((O_OP e) :: c) = VS(c)
+
+   Proof of Claim 6.1. Look at each step_5 step and do a case analysis ...
 *)
 
 let string_of_directive = function
@@ -369,7 +369,7 @@ let rec driver_6 n state =
 
 let eval_6 e = driver_6 1 ([ E e ], [])
 
-(*  side-by-side traces 
+(*  side-by-side traces
 
 eval_5 test1;;                       | eval_6 test1;
 ---------------------------------------------------------------------------
@@ -381,9 +381,9 @@ step 2 (EVAL)                        | state 2
 cnt = [O+((2 + (3 + (4 + 5))))]      | DS = [DO+; (2 + (3 + (4 + 5))); 1]
 expr = 1                             | VS = []
 ---------------------------------------------------------------------------
-step 3 (APPLY)                       | 
-cnt = [O+((2 + (3 + (4 + 5))))]      | 
-int = 1                              | 
+step 3 (APPLY)                       |
+cnt = [O+((2 + (3 + (4 + 5))))]      |
+int = 1                              |
 ---------------------------------------------------------------------------
 step 4 (EVAL)                        | state 3
 cnt = [I+(1)]                        | DS = [DO+; (2 + (3 + (4 + 5)))]
@@ -393,9 +393,9 @@ step 5 (EVAL)                        | state 4
 cnt = [I+(1); O+((3 + (4 + 5)))]     | DS = [DO+; DO+; (3 + (4 + 5)); 2]
 expr = 2                             | VS = [1]
 ---------------------------------------------------------------------------
-step 6 (APPLY)                       | 
-cnt = [I+(1); O+((3 + (4 + 5)))]     | 
-int = 2                              | 
+step 6 (APPLY)                       |
+cnt = [I+(1); O+((3 + (4 + 5)))]     |
+int = 2                              |
 ---------------------------------------------------------------------------
 step 7 (EVAL)                        | state 5
 cnt = [I+(1); I+(2)]                 | DS = [DO+; DO+; (3 + (4 + 5))]
@@ -405,9 +405,9 @@ step 8 (EVAL)                        | state 6
 cnt = [I+(1); I+(2); O+((4 + 5))]    | DS = [DO+; DO+; DO+; (4 + 5); 3]
 expr = 3                             | VS = [1; 2]
 ---------------------------------------------------------------------------
-step 9 (APPLY)                       | 
-cnt = [I+(1); I+(2); O+((4 + 5))]    | 
-int = 3                              | 
+step 9 (APPLY)                       |
+cnt = [I+(1); I+(2); O+((4 + 5))]    |
+int = 3                              |
 ---------------------------------------------------------------------------
 step 10 (EVAL)                       | state 7
 cnt = [I+(1); I+(2); I+(3)]          | DS = [DO+; DO+; DO+; (4 + 5)]
@@ -417,9 +417,9 @@ step 11 (APPLY)                      | state 8
 cnt = [I+(1); I+(2); I+(3); O+(5)]   | DS = [DO+; DO+; DO+; DO+; 5; 4]
 int = 4                              | VS = [1; 2; 3]
 ---------------------------------------------------------------------------
-step 12 (EVAL)                       | 
-cnt = [I+(1); I+(2); I+(3); O+(5)]   | 
-expr = 4                             | 
+step 12 (EVAL)                       |
+cnt = [I+(1); I+(2); I+(3); O+(5)]   |
+expr = 4                             |
 ---------------------------------------------------------------------------
 step 13 (EVAL)                       | state 9
 cnt = [I+(1); I+(2); I+(3); I+(4)]   | DS = [DO+; DO+; DO+; DO+; 5]
@@ -470,9 +470,9 @@ step 5 (EVAL)                        | state 5
 cnt = [O+(5); O+(4); O+(3); O+(2)]   | DS = [DO+; 5; DO+; 4; DO+; 3; DO+; 2; 1]
 expr = 1                             | VS = []
 ---------------------------------------------------------------------------
-step 6 (APPLY)                       | 
-cnt = [O+(5); O+(4); O+(3); O+(2)]   | 
-int = 1                              | 
+step 6 (APPLY)                       |
+cnt = [O+(5); O+(4); O+(3); O+(2)]   |
+int = 1                              |
 ---------------------------------------------------------------------------
 step 7 (EVAL)                        | state 6
 cnt = [O+(5); O+(4); O+(3); I+(1)]   | DS = [DO+; 5; DO+; 4; DO+; 3; DO+; 2]
@@ -484,11 +484,11 @@ int = 2                              | VS = [1; 2]
 ---------------------------------------------------------------------------
 step 9 (APPLY)                       | state 8
 cnt = [O+(5); O+(4); O+(3)]          | DS = [DO+; 5; DO+; 4; DO+; 3]
-int = 3                              | VS = [3]   
+int = 3                              | VS = [3]
 ---------------------------------------------------------------------------
-step 10 (EVAL)                       | 
-cnt = [O+(5); O+(4); I+(3)]          | 
-expr = 3                             | 
+step 10 (EVAL)                       |
+cnt = [O+(5); O+(4); I+(3)]          |
+expr = 3                             |
 ---------------------------------------------------------------------------
 step 11 (APPLY)                      | state 9
 cnt = [O+(5); O+(4); I+(3)]          | DS = [DO+; 5; DO+; 4; DO+]
@@ -496,11 +496,11 @@ int = 3                              | VS = [3; 3]
 ---------------------------------------------------------------------------
 step 12 (APPLY)                      | state 10
 cnt = [O+(5); O+(4)]                 | DS = [DO+; 5; DO+; 4]
-int = 6                              | VS = [6]   
+int = 6                              | VS = [6]
 ---------------------------------------------------------------------------
-step 13 (EVAL)                       | 
-cnt = [O+(5); I+(6)]                 | 
-expr = 4                             | 
+step 13 (EVAL)                       |
+cnt = [O+(5); I+(6)]                 |
+expr = 4                             |
 ---------------------------------------------------------------------------
 step 14 (APPLY)                      | state 11
 cnt = [O+(5); I+(6)]                 | DS = [DO+; 5; DO+]
@@ -510,9 +510,9 @@ step 15 (APPLY)                      | state 12
 cnt = [O+(5)]                        | DS = [DO+; 5]
 int = 10                             | VS = [10]
 ---------------------------------------------------------------------------
-step 16 (EVAL)                       | 
-cnt = [I+(10)]                       | 
-expr = 5                             | 
+step 16 (EVAL)                       |
+cnt = [I+(10)]                       |
+expr = 5                             |
 ---------------------------------------------------------------------------
 step 17 (APPLY)                      | state 13
 cnt = [I+(10)]                       | DS = [DO+]
@@ -526,28 +526,28 @@ int = 15                             | VS = [15]
 *)
 
 (******************************* eval_7 **************************************)
-(* 
-   Another tricky part!  
+(*
+   Another tricky part!
 
-   If we look at the these rules of step_6 
+   If we look at the these rules of step_6
 
    | (E(INT v) :: ds,            vs) -> (ds, v :: vs)
    | (E(PLUS(e1, e2)) :: ds,     vs) -> ((E e1) :: (E e2) :: DO_PLUS :: ds, vs)
-   | (E(SUBT(e1, e2)) :: ds,     vs) -> ((E e1) :: (E e2) :: DO_SUBT :: ds, vs) 
-   | (E(MULT(e1, e2)) :: ds,     vs) -> ((E e1) :: (E e2) :: DO_MULT :: ds, vs) 
+   | (E(SUBT(e1, e2)) :: ds,     vs) -> ((E e1) :: (E e2) :: DO_SUBT :: ds, vs)
+   | (E(MULT(e1, e2)) :: ds,     vs) -> ((E e1) :: (E e2) :: DO_MULT :: ds, vs)
 
-   we see that they only "take apart" an expression. Why don't 
-   we do this instead at "compile time" rather than at "runtime"? 
-   In other words, let's re-factor eval_6 so and define a function 
-   "compile" and eval_7 so that  eval_6(e) = eval_7(compile(e)). 
+   we see that they only "take apart" an expression. Why don't
+   we do this instead at "compile time" rather than at "runtime"?
+   In other words, let's re-factor eval_6 so and define a function
+   "compile" and eval_7 so that  eval_6(e) = eval_7(compile(e)).
 *)
 type instr = Ipush of int | Iplus | Isubt | Imult
 type code = instr list
 type state_7 = code * value_stack
 
-(* compile : expr -> code 
- 
-   Note similarity with the lines of step_6 mentioned above! 
+(* compile : expr -> code
+
+   Note similarity with the lines of step_6 mentioned above!
 *)
 let rec compile = function
   | INT a -> [ Ipush a ]
@@ -586,18 +586,18 @@ let eval_7 e = driver_7 1 (compile e, [])
 
 (* 			
 
-    Claim 7: For all e, eval_6(e) = eval_7(compile(e)). 
+    Claim 7: For all e, eval_6(e) = eval_7(compile(e)).
 
-    How to prove? Again we need a translation from T : state_6 -> state_6. 
+    How to prove? Again we need a translation from T : state_6 -> state_6.
 
-    T(DS, VS) = (IS(DS), VS) 
+    T(DS, VS) = (IS(DS), VS)
 
-    IS([]) = [] 
+    IS([]) = []
     IS(E(INT m) :: DS) = (Ipush m) :: IS(DS)
     IS(E(e) :: DS) = (compile e) @ IS(DS)
-    IS(DO_PLUS :: DS) = Iplus :: IS(DS) 
-    IS(DO_SUBT :: DS) = Isubt :: IS(DS) 
-    IS(DO_MULT :: DS) = Imult :: IS(DS) 
+    IS(DO_PLUS :: DS) = Iplus :: IS(DS)
+    IS(DO_SUBT :: DS) = Isubt :: IS(DS)
+    IS(DO_MULT :: DS) = Imult :: IS(DS)
 
 
 eval_6 test1;;                       | eval_7 test1;
@@ -606,33 +606,33 @@ state 1                              | state 1
 DS = [(1 + (2 + (3 + (4 + 5))))]     | [add; add; add; add; push 5; push 4; push 3; push 2; push 1]
 VS = []                              | VS = []
 ---------------------------------------------------------------------------
-state 2                              | 
-DS = [DO+; (2 + (3 + (4 + 5))); 1]   | 
-VS = []                              | 
+state 2                              |
+DS = [DO+; (2 + (3 + (4 + 5))); 1]   |
+VS = []                              |
 ---------------------------------------------------------------------------
 state 3                              | state 2
 DS = [DO+; (2 + (3 + (4 + 5)))]      | IS = [add; add; add; add; push 5; push 4; push 3; push 2]
 VS = [1]                             | VS = [1]
 ---------------------------------------------------------------------------
-state 4                              | 
-DS = [DO+; DO+; (3 + (4 + 5)); 2]    | 
-VS = [1]                             | 
+state 4                              |
+DS = [DO+; DO+; (3 + (4 + 5)); 2]    |
+VS = [1]                             |
 ---------------------------------------------------------------------------
 state 5                              | state 3
 DS = [DO+; DO+; (3 + (4 + 5))]       | IS = [add; add; add; add; push 5; push 4; push 3]
 VS = [1; 2]                          | VS = [1; 2]
 ---------------------------------------------------------------------------
-state 6                              | 
-DS = [DO+; DO+; DO+; (4 + 5); 3]     | 
-VS = [1; 2]                          | 
+state 6                              |
+DS = [DO+; DO+; DO+; (4 + 5); 3]     |
+VS = [1; 2]                          |
 ---------------------------------------------------------------------------
 state 7                              | state 4
 DS = [DO+; DO+; DO+; (4 + 5)]        | IS = [add; add; add; add; push 5; push 4]
 VS = [1; 2; 3]                       | VS = [1; 2; 3]
 ---------------------------------------------------------------------------
-state 8                              | 
-DS = [DO+; DO+; DO+; DO+; 5; 4]      | 
-VS = [1; 2; 3]                       | 
+state 8                              |
+DS = [DO+; DO+; DO+; DO+; 5; 4]      |
+VS = [1; 2; 3]                       |
 ---------------------------------------------------------------------------
 state 9                              | state 5
 DS = [DO+; DO+; DO+; DO+; 5]         | IS = [add; add; add; add; push 5]
@@ -660,27 +660,27 @@ VS = [15]                            | VS = [15]
 ---------------------------------------------------------------------------
 
 
-eval_6 test2;;                           | eval_7 test2;; 
+eval_6 test2;;                           | eval_7 test2;;
 ---------------------------------------------------------------------------
 state 1                                  | state 1
 DS = [((((1 + 2) + 3) + 4) + 5)]         | IS = [add; push 5; add; push 4; add; push 3; add; push 2; push 1]
 VS = []                                  | VS = []
 ---------------------------------------------------------------------------
-state 2                                  | 
-DS = [DO+; 5; (((1 + 2) + 3) + 4)]       | 
+state 2                                  |
+DS = [DO+; 5; (((1 + 2) + 3) + 4)]       |
 VS = []                                  |
 ---------------------------------------------------------------------------
 state 3                                  |
 DS = [DO+; 5; DO+; 4; ((1 + 2) + 3)]     |
-VS = []                                  | 
+VS = []                                  |
 ---------------------------------------------------------------------------
 state 4                                  |
-DS = [DO+; 5; DO+; 4; DO+; 3; (1 + 2)]   | 
-VS = []                                  | 
+DS = [DO+; 5; DO+; 4; DO+; 3; (1 + 2)]   |
+VS = []                                  |
 ---------------------------------------------------------------------------
-state 5                                  | 
-DS = [DO+; 5; DO+; 4; DO+; 3; DO+; 2; 1] | 
-VS = []                                  | 
+state 5                                  |
+DS = [DO+; 5; DO+; 4; DO+; 3; DO+; 2; 1] |
+VS = []                                  |
 ---------------------------------------------------------------------------
 state 6                                  | state 2
 DS = [DO+; 5; DO+; 4; DO+; 3; DO+; 2]    | IS = [add; push 5; add; push 4; add; push 3; add; push 2]
@@ -720,13 +720,13 @@ VS = [15]                                | VS = [15]
 ---------------------------------------------------------------------------
  *)
 
-(* 
+(*
    What can we conclude?
 
-   Claim: For all e, eval(e) = eval_7(e) = driver_7 (compile e, []). 
+   Claim: For all e, eval(e) = eval_7(e) = driver_7 (compile e, []).
 
    We have transformed the recursive "semantics" of expressions
-   into a compiler + a stack machine. 
-  
+   into a compiler + a stack machine.
+
 
 *)

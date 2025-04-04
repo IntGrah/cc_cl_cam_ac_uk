@@ -1,25 +1,25 @@
 (**************************************
 Compiler Construction 2016
-Computer Laboratory 
-University of Cambridge 
-Timothy G. Griffin (tgg22@cam.ac.uk) 
+Computer Laboratory
+University of Cambridge
+Timothy G. Griffin (tgg22@cam.ac.uk)
 *****************************************)
 
-(* gcd : int * int -> int 
+(* gcd : int * int -> int
 
-   This is a tail-recursive function. 
+   This is a tail-recursive function.
 *)
 let rec gcd (m, n) =
   if m = n then m else if m < n then gcd (m, n - m) else gcd (m - n, n)
 
 let l1 = List.map gcd [ (24, 638); (17, 289); (31, 1889) ]
 
-(* gcd_iter : int * int -> int 
+(* gcd_iter : int * int -> int
 
-   We can replace recursion with simple iteration. 
-   The OCaml compiler will do something similar 
-   to gcd (above), but on a lower-level intermediate 
-   representation. 
+   We can replace recursion with simple iteration.
+   The OCaml compiler will do something similar
+   to gcd (above), but on a lower-level intermediate
+   representation.
 *)
 
 let gcd_iter (m, n) =

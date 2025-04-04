@@ -1,6 +1,6 @@
-(* 
+(*
 
-   The Parsed AST 
+   The Parsed AST
 
 *)
 type var = string
@@ -81,7 +81,7 @@ let string_of_loc loc =
 open Format
 
 (*
-   Documentation of Format can be found here: 
+   Documentation of Format can be found here:
    http://caml.inria.fr/resources/doc/guides/format.en.html
    http://caml.inria.fr/pub/docs/manual-ocaml/libref/Format.html
 *)

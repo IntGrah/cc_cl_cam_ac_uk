@@ -2,7 +2,7 @@
 
 To use: fire up ocaml and then
 
-    #use "ackermann.ml";; 
+    #use "ackermann.ml";;
 
 *)
 
