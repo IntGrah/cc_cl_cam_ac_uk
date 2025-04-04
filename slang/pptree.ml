@@ -1,6 +1,11 @@
 (* Pretty Printing without brackets*)
 let string_replace_char s c_from c_to =
-  let char_map i = if s.[i] = c_from then c_to else s.[i] in
+  let char_map i =
+    if s.[i] = c_from then
+      c_to
+    else
+      s.[i]
+  in
   String.init (String.length s) char_map
 
 let tail s = String.sub s 1 (String.length s - 1)

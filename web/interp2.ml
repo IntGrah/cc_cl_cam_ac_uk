@@ -29,7 +29,13 @@ let string_lists_of_steps steps =
 
 let apply_to_last f l =
   let length = List.length l - 1 in
-  List.mapi (fun i x -> if length = i then f x else x) l
+  List.mapi
+    (fun i x ->
+      if length = i then
+        f x
+      else
+        x)
+    l
 
 let rec string_list_of_code c =
   match List.flatten @@ List.map string_list_of_instruction c with

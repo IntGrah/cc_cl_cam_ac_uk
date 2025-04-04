@@ -7,7 +7,10 @@ let print_if_verbose m e pp =
   if Option.verbose_front then
     print_string
       (m ^ ":\n"
-      ^ (if Option.verbose_tree then Pptree.pp_no_bracket else fun x -> x)
+      ^ (if Option.verbose_tree then
+           Pptree.pp_no_bracket
+         else
+           fun x -> x)
           (pp e)
       ^ "\n")
 

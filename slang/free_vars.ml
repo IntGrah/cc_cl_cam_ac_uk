@@ -5,7 +5,11 @@
 let free_vars (bound : Ast.var list) (exp : Ast.t) =
   let rec aux (bound : Ast.var list) (free : Ast.var list) :
       Ast.t -> Ast.var list = function
-    | Var x -> if List.mem x bound || List.mem x free then free else x :: free
+    | Var x ->
+        if List.mem x bound || List.mem x free then
+          free
+        else
+          x :: free
     | UnaryOp (_, e) -> aux bound free e
     | BinaryOp (e1, _, e2) -> aux bound (aux bound free e1) e2
     | If (e1, e2, e3) -> aux bound (aux bound (aux bound free e1) e2) e3

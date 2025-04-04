@@ -13,8 +13,10 @@ let rec driver n (cp, env) =
   let heapl = list_of_heap () in
   (cp, env, heapl)
   ::
-  (if Interp_3.HALT = Interp_3.get_instruction cp then []
-   else driver (n + 1) (Interp_3.step (cp, env)))
+  (if Interp_3.HALT = Interp_3.get_instruction cp then
+     []
+   else
+     driver (n + 1) (Interp_3.step (cp, env)))
 
 let stacks e =
   let c = Interp_3.compile e in

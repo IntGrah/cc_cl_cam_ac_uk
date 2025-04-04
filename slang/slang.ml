@@ -84,7 +84,8 @@ let interpreters =
 
 let show_output describe string_out =
   if not Option.run_tests then (
-    if Option.verbose then print_string ("\n" ^ describe ^ " \n");
+    if Option.verbose then
+      print_string ("\n" ^ describe ^ " \n");
     print_string ("output> " ^ string_out ^ "\n"))
 
 (* used for -t option *)
@@ -124,4 +125,5 @@ let () =
     (if Option.run_tests then
        try Tests.get_all_tests ()
        with Errors.Error s -> fatal_error "tests/" "Test.get_all_tests" s
-     else [ (Option.infile, None) ])
+     else
+       [ (Option.infile, None) ])

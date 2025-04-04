@@ -57,7 +57,13 @@ let rec string_of_value : value -> string = function
 (* update : (env * binding) -> env
    update : (store * (address * value)) -> store
 *)
-let update (env, (x, v)) = fun y -> if x = y then v else env y
+let update (env, (x, v)) =
+ fun y ->
+  if x = y then
+    v
+  else
+    env y
+
 let next_address = ref 0
 
 let new_address () =
@@ -159,7 +165,8 @@ let rec interpret (env : env) (e : Ast.t) (store : store) : value * store =
         (* a recursive environment! *)
         if g = f then
           `Fun (fun v s -> interpret (update (new_env, (x, v))) body s)
-        else env g
+        else
+          env g
       in
       interpret new_env e store
 

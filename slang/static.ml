@@ -8,8 +8,10 @@ type env = (Ast.var * Type.t) list
 let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
   let elab_as env (e : Past.t) (expecting : Type.t) =
     let elab, found = elab env e in
-    if found = expecting then elab
-    else expected e.loc (expecting :> Type.hole) found
+    if found = expecting then
+      elab
+    else
+      expected e.loc (expecting :> Type.hole) found
   in
   match e.expr with
   | Unit -> (Unit, `Unit)
@@ -45,7 +47,10 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
   | UnaryOp (op, e) -> (
       let e', t = elab env e in
       let exactly (a : Type.t) (b : Type.t) =
-        if t <> a then expected e.loc (a :> Type.hole) t else b
+        if t <> a then
+          expected e.loc (a :> Type.hole) t
+        else
+          b
       in
       match op with
       | Neg -> (UnaryOp (Neg, e'), exactly `Int `Int)
@@ -54,9 +59,12 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
       let e1', t1 = elab env e1 in
       let e2', t2 = elab env e2 in
       let exactly a b c =
-        if t1 <> a then expected e1.loc (a :> Type.hole) t1
-        else if t2 <> b then expected e2.loc (b :> Type.hole) t2
-        else c
+        if t1 <> a then
+          expected e1.loc (a :> Type.hole) t1
+        else if t2 <> b then
+          expected e2.loc (b :> Type.hole) t2
+        else
+          c
       in
       match op with
       | Add -> (BinaryOp (e1', Add, e2'), exactly `Int `Int `Int)
@@ -70,8 +78,16 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
           (* Monomorphise the equality operator *)
           let op' : Ast.Binary_op.t =
             match t1 with
-            | `Int -> if t2 <> `Int then expected e2.loc `Int t2 else Eqi
-            | `Bool -> if t2 <> `Bool then expected e2.loc `Bool t2 else Eqb
+            | `Int ->
+                if t2 <> `Int then
+                  expected e2.loc `Int t2
+                else
+                  Eqi
+            | `Bool ->
+                if t2 <> `Bool then
+                  expected e2.loc `Bool t2
+                else
+                  Eqb
             | _ -> expected e1.loc (`Variable "int_or_bool") t1
           in
           (BinaryOp (e1', op', e2'), `Bool))

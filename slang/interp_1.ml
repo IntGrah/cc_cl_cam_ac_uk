@@ -68,8 +68,10 @@ let rec inlist x = function [] -> false | y :: rest -> x = y || inlist x rest
 let rec filter_env fvars = function
   | [] -> []
   | (x, v) :: rest ->
-      if inlist x fvars then (x, v) :: filter_env fvars rest
-      else filter_env fvars rest
+      if inlist x fvars then
+        (x, v) :: filter_env fvars rest
+      else
+        filter_env fvars rest
 
 let mk_fun (x, body, env) =
   let fvars = Free_vars.free_vars [ x ] body in
@@ -96,7 +98,8 @@ let lookup (env, x) =
           | `Rec_closure (z, body, _) ->
               `Closure (z, body, (y, `Rec_closure (z, body, [])) :: rest)
           | _ -> v
-        else aux rest
+        else
+          aux rest
   in
   aux env
 

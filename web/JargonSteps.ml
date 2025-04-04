@@ -104,12 +104,20 @@ let rec node_list_of_heap_item_list_ index header n = function
   | [] -> []
   | HEAP_HEADER (i, t) :: heap_item_list ->
       node_of_heap_item index
-        (if n > 0 then header else "")
+        (if n > 0 then
+           header
+         else
+           "")
         (HEAP_HEADER (i, t))
       :: node_list_of_heap_item_list_ (index + 1) (string_of_int index) (i - 1)
            heap_item_list
   | heap_item :: heap_item_list ->
-      node_of_heap_item index (if n > 0 then header else "") heap_item
+      node_of_heap_item index
+        (if n > 0 then
+           header
+         else
+           "")
+        heap_item
       :: node_list_of_heap_item_list_ (index + 1) header (n - 1) heap_item_list
 
 let node_list_of_heap_item_list heap_item_list =
@@ -170,7 +178,10 @@ let rec driver n vm =
   let state = string_lists_of_vm_state vm in
   state
   ::
-  (if vm.Jargon.status = Jargon.Running then driver (n + 1) (step vm) else [])
+  (if vm.Jargon.status = Jargon.Running then
+     driver (n + 1) (step vm)
+   else
+     [])
 
 let steps exp =
   let c = compile exp in

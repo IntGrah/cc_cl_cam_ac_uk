@@ -56,7 +56,12 @@ let emit_x86 e =
     (*want comments to line up nicely! *)
     let l = String.length c in
     let tab_string =
-      if l < 8 then "\t\t\t" else if l < 16 then "\t\t" else "\t"
+      if l < 8 then
+        "\t\t\t"
+      else if l < 16 then
+        "\t\t"
+      else
+        "\t"
     in
     output_string out_chan ("\t" ^ c ^ tab_string ^ "# " ^ comment ^ "\n")
   in
@@ -309,7 +314,10 @@ let emit_x86 e =
         emitl l
   in
   let do_command s =
-    if 0 = Sys.command s then () else complain ("command failed: " ^ s)
+    if 0 = Sys.command s then
+      ()
+    else
+      complain ("command failed: " ^ s)
   in
   let defs, cl =
     comp [] e

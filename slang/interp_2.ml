@@ -137,7 +137,8 @@ let pp_state fmt (heap, i) =
     if i > k then
       pr fmt "%d -> %a@\n%a" k pp_value (IntMap.find k heap) aux (k + 1)
   in
-  if i <> 0 then pr fmt "@\nHeap = @\n%a" aux 0
+  if i <> 0 then
+    pr fmt "@\nHeap = @\n%a" aux 0
 
 let pp_interp_state fmt (c, evs, s) =
   pr fmt "@\nCode Stack = @\n%a@\nEnv/Value Stack = @\n%a%a" pp_code c
@@ -157,7 +158,8 @@ let allocate (heap, i) v =
   if i < Option.heap_max then
     let heap = IntMap.add i v heap in
     (i, (heap, i + 1))
-  else complain "runtime error: heap kaput"
+  else
+    complain "runtime error: heap kaput"
 
 let deref (heap, _) a = IntMap.find a heap
 
@@ -308,6 +310,7 @@ let initial_env = []
 let interpret e =
   let c = compile e in
   let () =
-    if Option.verbose then Format.printf "Compile code =@\n%a@." pp_code c
+    if Option.verbose then
+      Format.printf "Compile code =@\n%a@." pp_code c
   in
   driver 1 (c, initial_env, initial_state)

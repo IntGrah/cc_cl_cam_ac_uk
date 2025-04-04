@@ -160,7 +160,8 @@ let rec string_of_listing = function
 
 let string_of_installed_code (code, size) =
   let rec aux k =
-    if size = k then ""
+    if size = k then
+      ""
     else
       string_of_int k ^ ": "
       ^ string_of_instruction code.(k)
@@ -171,7 +172,8 @@ let string_of_installed_code (code, size) =
 
 let string_of_stack (sp, stack) =
   let rec aux carry j =
-    if j = sp then carry
+    if j = sp then
+      carry
     else
       aux
         (string_of_int j ^ ": "
@@ -183,7 +185,8 @@ let string_of_stack (sp, stack) =
 
 let string_of_heap vm =
   let rec aux k =
-    if vm.hp <= k then ""
+    if vm.hp <= k then
+      ""
     else
       string_of_int k ^ " -> "
       ^ string_of_heap_item vm.heap.(k)
@@ -197,7 +200,11 @@ let string_of_state vm =
   ^ string_of_instruction (get_instruction vm)
   ^ "\n" ^ "fp = " ^ string_of_int vm.fp ^ "\n" ^ "Stack = \n"
   ^ string_of_stack (vm.sp, vm.stack)
-  ^ if vm.hp = 0 then "" else string_of_heap vm
+  ^
+  if vm.hp = 0 then
+    ""
+  else
+    string_of_heap vm
 
 (* the following two functions are needed to
    pretty-print heap and stack values
@@ -264,15 +271,19 @@ let heap_to_stack_item = function
 
 (* cp := cp + 1  *)
 let advance_cp vm =
-  if vm.cp < vm.code_bound then { vm with cp = vm.cp + 1 }
-  else { vm with status = CodeIndexOutOfBound }
+  if vm.cp < vm.code_bound then
+    { vm with cp = vm.cp + 1 }
+  else
+    { vm with status = CodeIndexOutOfBound }
 
 let goto (i, vm) = { vm with cp = i }
 
 (* pop n items from stack *)
 let pop (n, vm) =
-  if 0 <= vm.sp - n then { vm with sp = vm.sp - n }
-  else { vm with status = StackUnderflow }
+  if 0 <= vm.sp - n then
+    { vm with sp = vm.sp - n }
+  else
+    { vm with status = StackUnderflow }
 
 let pop_top vm =
   let c = stack_top vm in
@@ -283,7 +294,8 @@ let push (c, vm) =
   if vm.sp < vm.stack_bound then
     let _ = Array.set vm.stack vm.sp c in
     { vm with sp = vm.sp + 1 }
-  else { vm with status = StackIndexOutOfBound }
+  else
+    { vm with status = StackIndexOutOfBound }
 
 let swap vm =
   let c1, vm1 = pop_top vm in
@@ -336,14 +348,16 @@ let invoke_garbage_collection _ = None
 
 let allocate (n, vm) =
   let hp1 = vm.hp in
-  if hp1 + n < vm.heap_bound then (hp1, { vm with hp = vm.hp + n })
+  if hp1 + n < vm.heap_bound then
+    (hp1, { vm with hp = vm.hp + n })
   else
     match invoke_garbage_collection vm with
     | None -> Errors.complain "allocate : heap exhausted"
     | Some vm2 ->
         if vm2.hp + n < vm2.heap_bound then
           (vm2.hp, { vm2 with hp = vm2.hp + n })
-        else Errors.complain "allocate : heap exhausted"
+        else
+          Errors.complain "allocate : heap exhausted"
 
 let mk_pair vm =
   let v_right, vm1 = pop_top vm in
@@ -425,14 +439,17 @@ let assign vm =
       if vm.sp < vm.heap_bound then
         let _ = Array.set vm.heap a (stack_to_heap_item c1) in
         push (STACK_UNIT, vm)
-      else { vm with status = HeapIndexOutOfBound }
+      else
+        { vm with status = HeapIndexOutOfBound }
   | _ -> Errors.complain "assing: runtime error, expecting heap index on stack"
 
 let test (i, vm) =
   pop
     ( 1,
-      if stack_top vm = STACK_BOOL true then advance_cp vm
-      else { vm with cp = i } )
+      if stack_top vm = STACK_BOOL true then
+        advance_cp vm
+      else
+        { vm with cp = i } )
 
 let return vm =
   let current_fp = vm.fp in
@@ -459,7 +476,8 @@ let mk_closure = function
       let _ = vm1.heap.(a) <- header in
       let _ = vm1.heap.(a + 1) <- code_address in
       let rec aux m =
-        if m = n then ()
+        if m = n then
+          ()
         else
           let v = stack_to_heap_item vm1.stack.(vm.sp - (m + 1)) in
           let _ = vm1.heap.(a + m + 2) <- v in
@@ -522,7 +540,10 @@ let rec driver n vm =
         ("========== state " ^ string_of_int n ^ " ==========\n"
        ^ string_of_state vm ^ "\n")
   in
-  if vm.status = Running then driver (n + 1) (step vm) else vm
+  if vm.status = Running then
+    driver (n + 1) (step vm)
+  else
+    vm
 
 let map_instruction_labels f = function
   | GOTO (lab, _) -> GOTO (lab, Some (f lab))
@@ -534,7 +555,11 @@ let map_instruction_labels f = function
 let rec find l y =
   match l with
   | [] -> Errors.complain ("Compile.find : " ^ y ^ " is not found")
-  | (x, v) :: rest -> if x = y then v else find rest y
+  | (x, v) :: rest ->
+      if x = y then
+        v
+      else
+        find rest y
 
 (* put code listing into an array, associate an array index to each label *)
 let load instr_list =

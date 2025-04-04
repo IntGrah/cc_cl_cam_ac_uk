@@ -82,7 +82,8 @@ let rec lookup (env, x) =
           (match v with
           | `Rec_closure loc -> `Closure (loc, (y, `Rec_closure loc) :: rest)
           | _ -> v)
-      else lookup (rest, x)
+      else
+        lookup (rest, x)
 
 let rec search (evs, x) =
   match evs with
@@ -192,15 +193,20 @@ let new_address () =
 
 let string_of_heap () =
   let rec aux k =
-    if !next_address < k then ""
-    else string_of_int k ^ " -> " ^ string_of_value heap.(k) ^ "\n" ^ aux (k + 1)
+    if !next_address < k then
+      ""
+    else
+      string_of_int k ^ " -> " ^ string_of_value heap.(k) ^ "\n" ^ aux (k + 1)
   in
   "\nHeap = \n" ^ aux 0
 
 let pp_state fmt (cp, evs) =
   pr fmt "@\nCode Pointer = %d -> %a@\nStack = %a%s@\n" cp pp_instruction
     (get_instruction cp) pp_env_value_stack evs
-    (if !next_address = 0 then "" else string_of_heap ())
+    (if !next_address = 0 then
+       ""
+     else
+       string_of_heap ())
 
 let step (cp, evs) =
   match (get_instruction cp, evs) with
@@ -396,7 +402,8 @@ let compile e =
   result
 
 let rec driver n ((cp, evs) as state) =
-  if Option.verbose then Format.printf "\nstate %d:%a\n" n pp_state state;
+  if Option.verbose then
+    Format.printf "\nstate %d:%a\n" n pp_state state;
   match (get_instruction cp, evs) with
   | HALT, [ V v ] -> v
   | HALT, _ -> complainf "driver : bad halted state = %a\n" pp_state state
@@ -406,7 +413,11 @@ let rec driver n ((cp, evs) as state) =
 let load l =
   let rec find lab = function
     | [] -> complainf "find : %s is not found" lab
-    | (x, v) :: rest -> if x = lab then v else find lab rest
+    | (x, v) :: rest ->
+        if x = lab then
+          v
+        else
+          find lab rest
     (* insert array index for each label *)
   in
   let apply_label_map_to_instruction m = function

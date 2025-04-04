@@ -49,8 +49,7 @@ let rec fib_cps (m, cnt) =
   else
     fib_cps (m - 1, fun a -> fib_cps (m - 2, fun b -> cnt (a + b)))
 
-(* Here is a version using lets, not "lambdas"
-*)
+(* Here is a version using lets, not "lambdas" *)
 let rec fib_cps_v2 (m, cnt) =
   if m = 0 then
     cnt 1
