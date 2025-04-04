@@ -128,8 +128,8 @@ and pp_location fmt = function
   | l, Some i -> pr fmt "%s = %d" l i
 
 and pp_instruction fmt = function
-  | UNARY op -> pr fmt "  UNARY %a" Ast.Unary_op.pp op
-  | OPER op -> pr fmt "  OPER %a" Ast.Binary_op.pp op
+  | UNARY op -> pr fmt "  UNARY %s" (Ast.Unary_op.to_string op)
+  | OPER op -> pr fmt "  OPER %s" (Ast.Binary_op.to_string op)
   | MK_PAIR -> pr fmt "  MK_PAIR"
   | FST -> pr fmt "  FST"
   | SND -> pr fmt "  SND"
