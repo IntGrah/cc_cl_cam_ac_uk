@@ -41,7 +41,7 @@ let rec fib m =
 
    fib_cps : (int *(int -> int)) -> int
 *)
-let rec fib_cps (m, cnt) =
+let rec fib_cps (m, cnt) : int =
   if m = 0 then
     cnt 1
   else if m = 1 then
@@ -60,25 +60,20 @@ let rec fib_cps_v2 (m, cnt) =
     let cnt1 a = fib_cps_v2 (m - 2, cnt2 a) in
     fib_cps_v2 (m - 1, cnt1)
 
-(* id : int -> int *)
-let id (x : int) = x
-
-(*   fib_1 : int -> int *)
-let fib_1 m = fib_cps_v2 (m, id)
+let id (x : int) : int = x
+let fib_1 (m : int) : int = fib_cps_v2 (m, id)
 
 (* Now apply defunctionalization (dfc). *)
 
 (* datatype to represent continuations *)
 type cnt = ID | CNT1 of int * cnt | CNT2 of int * cnt
 
-(* apply_cnt : cnt * int -> int *)
-let rec apply_cnt = function
+let rec apply_cnt : cnt * int -> int = function
   | ID, a -> a
   | CNT1 (m, cnt), a -> fib_cps_dfc (m - 2, CNT2 (a, cnt))
   | CNT2 (a, cnt), b -> apply_cnt (cnt, a + b)
 
-(*  fib_cps_dfc : (cnt * int) -> int *)
-and fib_cps_dfc (m, cnt) =
+and fib_cps_dfc (m, cnt) : int =
   if m = 0 then
     apply_cnt (cnt, 1)
   else if m = 1 then
@@ -99,14 +94,12 @@ let fib_2 m = fib_cps_dfc (m, ID)
 type tag = SUB2 of int | PLUS of int
 type tag_list_cnt = tag list
 
-(* apply_tag_list_cnt : tag_list_cnt * int -> int *)
-let rec apply_tag_list_cnt = function
+let rec apply_tag_list_cnt : tag_list_cnt * int -> int = function
   | [], a -> a
   | SUB2 m :: cnt, a -> fib_cps_dfc_tags (m - 2, PLUS a :: cnt)
   | PLUS a :: cnt, b -> apply_tag_list_cnt (cnt, a + b)
 
-(* fib_cps_dfc_tags : (tag_list_cnt * int) -> int *)
-and fib_cps_dfc_tags (m, cnt) =
+and fib_cps_dfc_tags (m, cnt) : int =
   if m = 0 then
     apply_tag_list_cnt (cnt, 1)
   else if m = 1 then
@@ -114,8 +107,7 @@ and fib_cps_dfc_tags (m, cnt) =
   else
     fib_cps_dfc_tags (m - 1, SUB2 m :: cnt)
 
-(*  fib_3 : int -> int *)
-let fib_3 m = fib_cps_dfc_tags (m, [])
+let fib_3 (m : int) : int = fib_cps_dfc_tags (m, [])
 
 (* Another Eureka moment. Look closely at this code.
 
@@ -135,13 +127,10 @@ type state_type =
   | SUB1 (* for right-hand-sides starting with fib_   *)
   | APPL (* for right-hand-sides starting with apply_ *)
 
-type state = state_type * int * tag_list_cnt -> int
+type state = state_type * int * tag_list_cnt
 
-(* We now rewrite the version above as a state-transition evaluator
-
-   eval : state -> int
-*)
-let rec eval = function
+(* We now rewrite the version above as a state-transition evaluator. *)
+let rec eval : state -> int = function
   | SUB1, 0, cnt -> eval (APPL, 1, cnt)
   | SUB1, 1, cnt -> eval (APPL, 1, cnt)
   | SUB1, m, cnt -> eval (SUB1, m - 1, SUB2 m :: cnt)
@@ -149,8 +138,7 @@ let rec eval = function
   | APPL, b, PLUS a :: cnt -> eval (APPL, a + b, cnt)
   | APPL, a, [] -> a
 
-(*  fib_4 : int -> int *)
-let fib_4 m = eval (SUB1, m, [])
+let fib_4 (m : int) : int = eval (SUB1, m, [])
 
 (* Finally, The Fibonacci Machine!
 
@@ -162,8 +150,7 @@ let fib_4 m = eval (SUB1, m, [])
 
 *)
 
-(* step : state -> state *)
-let step = function
+let step : state -> state = function
   | SUB1, 0, cnt -> (APPL, 1, cnt)
   | SUB1, 1, cnt -> (APPL, 1, cnt)
   | SUB1, m, cnt -> (SUB1, m - 1, SUB2 m :: cnt)
@@ -195,23 +182,21 @@ let print_state n (t, m, cnt) =
 (* set to false if you don't want to watch the machine's transitions ... *)
 let verbose = ref true
 
-(* eval_steps : state -> int
-
+(*
    The Ocaml compiler probably compiles this recursive function
    into iteration (no stack).  Of course we have build "the stack"
    into our machine ;-)
 
 *)
-let rec eval_steps n state =
+let rec eval_steps (n : int) (state : state) : int =
   if !verbose then
     print_state n state;
   match state with APPL, a, [] -> a | _ -> eval_steps (n + 1) (step state)
 
-(*  fib_5 : int -> int *)
-let fib_5 m = eval_steps 1 (SUB1, m, [])
+let fib_5 (m : int) : int = eval_steps 1 (SUB1, m, [])
 
 (* just for testing to see if all versions return the same value *)
-let fibs m = [ fib m; fib_1 m; fib_2 m; fib_3 m; fib_4 m; fib_5 m ]
+let fibs (m : int) = (fib m, fib_1 m, fib_2 m, fib_3 m, fib_4 m, fib_5 m)
 
 (* Here is a trace of fib_5 6.
 
