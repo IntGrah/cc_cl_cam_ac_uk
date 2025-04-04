@@ -1,5 +1,3 @@
-open Ast
-
 type code_index = int
 type stack_index = int
 type heap_index = int
@@ -39,8 +37,8 @@ type value_path = STACK_LOCATION of offset | HEAP_LOCATION of offset
 type instruction =
   | PUSH of stack_item (* modified *)
   | LOOKUP of value_path (* modified *)
-  | UNARY of unary_oper
-  | OPER of oper
+  | UNARY of Ast.unary_op
+  | OPER of Ast.binary_op
   | ASSIGN
   | SWAP
   | POP
@@ -131,8 +129,8 @@ let string_of_location = function
   | l, Some i -> l ^ " = " ^ string_of_int i
 
 let string_of_instruction = function
-  | UNARY op -> "UNARY " ^ string_of_uop op
-  | OPER op -> "OPER " ^ string_of_bop op
+  | UNARY op -> "UNARY " ^ Unary_op.to_string op
+  | OPER op -> "OPER " ^ Binary_op.to_string op
   | MK_PAIR -> "MK_PAIR"
   | FST -> "FST"
   | SND -> "SND"
@@ -292,27 +290,27 @@ let swap vm =
   let c2, vm2 = pop_top vm1 in
   push (c2, push (c1, vm2))
 
-let do_unary = function
-  | NOT, STACK_BOOL m -> STACK_BOOL (not m)
-  | NEG, STACK_INT m -> STACK_INT (-m)
-  | READ, STACK_UNIT -> STACK_INT (readint ())
+let do_unary : Ast.unary_op * stack_item -> stack_item = function
+  | `Not, STACK_BOOL m -> STACK_BOOL (not m)
+  | `Neg, STACK_INT m -> STACK_INT (-m)
+  | `Read, STACK_UNIT -> STACK_INT (readint ())
   | op, _ ->
       Errors.complain
-        ("do_unary: malformed unary operator: " ^ string_of_unary_oper op)
+        ("do_unary: malformed unary operator: " ^ Unary_op.to_string op)
 
-let do_oper = function
-  | AND, STACK_BOOL m, STACK_BOOL n -> STACK_BOOL (m && n)
-  | OR, STACK_BOOL m, STACK_BOOL n -> STACK_BOOL (m || n)
-  | EQB, STACK_BOOL m, STACK_BOOL n -> STACK_BOOL (m = n)
-  | LT, STACK_INT m, STACK_INT n -> STACK_BOOL (m < n)
-  | EQI, STACK_INT m, STACK_INT n -> STACK_BOOL (m = n)
-  | ADD, STACK_INT m, STACK_INT n -> STACK_INT (m + n)
-  | SUB, STACK_INT m, STACK_INT n -> STACK_INT (m - n)
-  | MUL, STACK_INT m, STACK_INT n -> STACK_INT (m * n)
-  | DIV, STACK_INT m, STACK_INT n -> STACK_INT (m / n)
+let do_oper : Ast.binary_op * stack_item * stack_item -> stack_item = function
+  | `And, STACK_BOOL m, STACK_BOOL n -> STACK_BOOL (m && n)
+  | `Or, STACK_BOOL m, STACK_BOOL n -> STACK_BOOL (m || n)
+  | `Eqb, STACK_BOOL m, STACK_BOOL n -> STACK_BOOL (m = n)
+  | `Lt, STACK_INT m, STACK_INT n -> STACK_BOOL (m < n)
+  | `Eqi, STACK_INT m, STACK_INT n -> STACK_BOOL (m = n)
+  | `Add, STACK_INT m, STACK_INT n -> STACK_INT (m + n)
+  | `Sub, STACK_INT m, STACK_INT n -> STACK_INT (m - n)
+  | `Mul, STACK_INT m, STACK_INT n -> STACK_INT (m * n)
+  | `Div, STACK_INT m, STACK_INT n -> STACK_INT (m / n)
   | op, _, _ ->
       Errors.complain
-        ("do_oper: malformed binary operator: " ^ string_of_oper op)
+        ("do_oper: malformed binary operator: " ^ Binary_op.to_string op)
 
 let perform_op (op, vm) =
   let v_right, vm1 = pop_top vm in
@@ -639,14 +637,14 @@ let positions l =
   in
   aux 1 l
 
-let rec comp vmap = function
+let rec comp vmap : Ast.t -> listing * listing = function
   | Unit -> ([], [ PUSH STACK_UNIT ])
   | Boolean b -> ([], [ PUSH (STACK_BOOL b) ])
   | Integer n -> ([], [ PUSH (STACK_INT n) ])
   | UnaryOp (op, e) ->
       let defs, c = comp vmap e in
       (defs, c @ [ UNARY op ])
-  | Op (e1, op, e2) ->
+  | BinaryOp (e1, op, e2) ->
       let defs1, c1 = comp vmap e1 in
       let defs2, c2 = comp vmap e2 in
       (defs1 @ defs2, c1 @ c2 @ [ OPER op ])
@@ -736,7 +734,7 @@ and comp_lambda vmap (f_opt, x, e) =
     match f_opt with None -> [] | Some f -> [ (f, STACK_LOCATION (-1)) ]
   in
   let x_bind = (x, STACK_LOCATION (-2)) in
-  let fvars = Free_vars.free_vars (bound_vars, e) in
+  let fvars = Free_vars.free_vars bound_vars e in
   let fetch_fvars = List.map (fun y -> LOOKUP (find vmap y)) fvars in
   let fvar_bind (y, p) = (y, HEAP_LOCATION p) in
   let env_bind = List.map fvar_bind (positions fvars) in

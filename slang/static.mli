@@ -1,5 +1,6 @@
-open Past
+exception
+  Type_error of { loc : Past.Loc.t; expecting : Type.hole; found : Type.t }
 
-type env = (var * type_expr) list
+type env = (Past.var * Type.t) list
 
-val infer : env -> expr -> expr * type_expr
+val elab : env -> Past.t -> Ast.t * Type.t

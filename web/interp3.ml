@@ -1,6 +1,5 @@
 open Slanglib
 open Interp_3
-open Ast
 
 let string_state (cp, evs, heap_list) =
   ( cp,
@@ -24,8 +23,8 @@ let stacks e =
   (installed_code, List.map string_state (driver 1 (0, [])))
 
 let string_list_of_instruction : instruction -> string list = function
-  | UNARY op -> [ "UNARY " ^ string_of_uop op ]
-  | OPER op -> [ "OPER " ^ string_of_bop op ]
+  | UNARY op -> [ "UNARY " ^ Unary_op.to_string op ]
+  | OPER op -> [ "OPER " ^ Binary_op.to_string op ]
   | MK_PAIR -> [ "MK_PAIR" ]
   | FST -> [ "FST" ]
   | SND -> [ "SND" ]

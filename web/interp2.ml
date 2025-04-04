@@ -1,5 +1,4 @@
 open Slanglib
-open Ast
 open Interp_2
 
 type 'a steps = Interp_2.interp_state list
@@ -39,8 +38,8 @@ let rec string_list_of_code c =
   | s :: t -> ("[" ^ s) :: apply_to_last (fun s -> s ^ "]") t
 
 and string_list_of_instruction : instruction -> string list = function
-  | UNARY op -> [ "UNARY " ^ string_of_uop op ]
-  | OPER op -> [ "OPER " ^ string_of_bop op ]
+  | UNARY op -> [ "UNARY " ^ Unary_op.to_string op ]
+  | OPER op -> [ "OPER " ^ Binary_op.to_string op ]
   | MK_PAIR -> [ "MK_PAIR" ]
   | FST -> [ "FST" ]
   | SND -> [ "SND" ]

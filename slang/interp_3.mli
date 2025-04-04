@@ -2,22 +2,13 @@ type address = int
 type label = string
 type location = label * address option
 
-type value =
-  | REF of address
-  | INT of int
-  | BOOL of bool
-  | UNIT
-  | PAIR of value * value
-  | INL of value
-  | INR of value
-  | CLOSURE of location * env
-  | REC_CLOSURE of location
+type value
 
 and instruction =
   | PUSH of value
   | LOOKUP of Ast.var
-  | UNARY of Ast.unary_oper
-  | OPER of Ast.oper
+  | UNARY of Ast.unary_op
+  | OPER of Ast.binary_op
   | ASSIGN
   | SWAP
   | POP
@@ -54,12 +45,12 @@ type state = address * env_value_stack
 val installed : instruction array ref
 val load : instruction list -> instruction array
 val step : state -> state
-val compile : Ast.expr -> code
+val compile : Ast.t -> code
 val heap : value array
 val next_address : address ref
 val driver : int -> state -> value
 val get_instruction : address -> instruction
-val interpret : Ast.expr -> value
+val interpret : Ast.t -> value
 val pp_code : Format.formatter -> code -> unit
 val pp_value : Format.formatter -> value -> unit
 val pp_env_or_value : Format.formatter -> env_or_value -> unit

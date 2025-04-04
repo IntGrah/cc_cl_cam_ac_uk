@@ -15,7 +15,6 @@ What do I mean by "high-level"?
 ---Program variables contained in code.
 *)
 
-open Ast
 open Errors
 
 module IntMap = Map.Make (struct
@@ -28,23 +27,23 @@ type address = int
 type var = string
 
 type value =
-  | REF of address
-  | INT of int
-  | BOOL of bool
-  | UNIT
-  | PAIR of value * value
-  | INL of value
-  | INR of value
-  | CLOSURE of closure
-  | REC_CLOSURE of code
+  [ `Ref of address
+  | `Int of int
+  | `Bool of bool
+  | `Unit
+  | `Pair of value * value
+  | `Inl of value
+  | `Inr of value
+  | `Closure of closure
+  | `Rec_closure of code ]
 
 and closure = code * env
 
 and instruction =
   | PUSH of value
   | LOOKUP of var
-  | UNARY of Ast.unary_oper
-  | OPER of Ast.oper
+  | UNARY of Ast.unary_op
+  | OPER of Ast.binary_op
   | ASSIGN
   | SWAP
   | POP
@@ -87,24 +86,24 @@ let pp_list fmt sep f l =
   in
   pr fmt "@[[%a]@]" (aux f) l
 
-let rec pp_value fmt = function
-  | REF a -> pr fmt "REF(%d)" a
-  | BOOL b -> pr fmt "%b" b
-  | INT n -> pr fmt "%d" n
-  | UNIT -> pr fmt "UNIT"
-  | PAIR (v1, v2) -> pr fmt "(%a, %a)" pp_value v1 pp_value v2
-  | INL v -> pr fmt "inl(%a)" pp_value v
-  | INR v -> pr fmt "inr(%a)" pp_value v
-  | CLOSURE cl -> pr fmt "CLOSURE(%a)" pp_closure cl
-  | REC_CLOSURE c -> pr fmt "REC_CLOSURE(%a)" pp_code c
+let rec pp_value fmt : value -> unit = function
+  | `Ref a -> pr fmt "REF(%d)" a
+  | `Bool b -> pr fmt "%b" b
+  | `Int n -> pr fmt "%d" n
+  | `Unit -> pr fmt "UNIT"
+  | `Pair (v1, v2) -> pr fmt "(%a, %a)" pp_value v1 pp_value v2
+  | `Inl v -> pr fmt "inl(%a)" pp_value v
+  | `Inr v -> pr fmt "inr(%a)" pp_value v
+  | `Closure cl -> pr fmt "CLOSURE(%a)" pp_closure cl
+  | `Rec_closure c -> pr fmt "REC_CLOSURE(%a)" pp_code c
 
 and pp_closure fmt (c, env) = pr fmt "(%a, %a)" pp_code c pp_env env
 and pp_env fmt env = pp_list fmt ",@\n " pp_binding env
 and pp_binding fmt (x, v) = pr fmt "(%s, %a)" x pp_value v
 
 and pp_instruction fmt = function
-  | UNARY op -> pr fmt "@[UNARY %s@]" (string_of_uop op)
-  | OPER op -> pr fmt "@[OPER %s@]" (string_of_bop op)
+  | UNARY op -> pr fmt "@[UNARY %s@]" (Unary_op.to_string op)
+  | OPER op -> pr fmt "@[OPER %s@]" (Binary_op.to_string op)
   | MK_PAIR -> pr fmt "MK_PAIR"
   | FST -> pr fmt "FST"
   | SND -> pr fmt "SND"
@@ -169,8 +168,8 @@ let assign (heap, i) a v =
 (* update : (env * binding) -> env *)
 (* let update(env, (x, v)) = (x, v) :: env *)
 
-let mk_fun (c, env) = CLOSURE (c, env)
-let mk_rec (f, c, env) = CLOSURE (c, (f, REC_CLOSURE c) :: env)
+let mk_fun (c, env) = `Closure (c, env)
+let mk_rec (f, c, env) = `Closure (c, (f, `Rec_closure c) :: env)
 
 (*
    in interp_0:
@@ -188,7 +187,8 @@ let mk_rec (f, c, env) = CLOSURE (c, (f, REC_CLOSURE c) :: env)
 *)
 let rec lookup_opt = function
   | [], _ -> None
-  | (y, REC_CLOSURE body) :: rest, x when x = y -> Some (mk_rec (x, body, rest))
+  | (y, `Rec_closure body) :: rest, x when x = y ->
+      Some (mk_rec (x, body, rest))
   | (y, v) :: _, x when x = y -> Some v
   | (_, _) :: rest, x -> lookup_opt (rest, x)
 
@@ -204,28 +204,6 @@ let rec evs_to_env = function
   | V _ :: rest -> evs_to_env rest
   | EV env :: rest -> env @ evs_to_env rest
 
-let readint () =
-  let _ = print_string "input> " in
-  read_int ()
-
-let do_unary = function
-  | NOT, BOOL m -> BOOL (not m)
-  | NEG, INT m -> INT (-m)
-  | READ, UNIT -> INT (readint ())
-  | op, _ -> complainf "malformed unary operator: %s" (string_of_unary_oper op)
-
-let do_oper = function
-  | AND, BOOL m, BOOL n -> BOOL (m && n)
-  | OR, BOOL m, BOOL n -> BOOL (m || n)
-  | EQB, BOOL m, BOOL n -> BOOL (m = n)
-  | LT, INT m, INT n -> BOOL (m < n)
-  | EQI, INT m, INT n -> BOOL (m = n)
-  | ADD, INT m, INT n -> INT (m + n)
-  | SUB, INT m, INT n -> INT (m - n)
-  | MUL, INT m, INT n -> INT (m * n)
-  | DIV, INT m, INT n -> INT (m / n)
-  | op, _, _ -> complainf "malformed binary operator: %s" (string_of_oper op)
-
 (*
     val step : interp_state -> interp_state
              = (code * env_value_stack * state) -> (code * env_value_stack * state)
@@ -237,30 +215,31 @@ let step = function
   | SWAP :: ds, e1 :: e2 :: evs, s -> (ds, e2 :: e1 :: evs, s)
   | BIND x :: ds, V v :: evs, s -> (ds, EV [ (x, v) ] :: evs, s)
   | LOOKUP x :: ds, evs, s -> (ds, V (search (evs, x)) :: evs, s)
-  | UNARY op :: ds, V v :: evs, s -> (ds, V (do_unary (op, v)) :: evs, s)
+  | UNARY op :: ds, V v :: evs, s -> (ds, V (Unary_op.to_fun op v) :: evs, s)
   | OPER op :: ds, V v2 :: V v1 :: evs, s ->
-      (ds, V (do_oper (op, v1, v2)) :: evs, s)
-  | MK_PAIR :: ds, V v2 :: V v1 :: evs, s -> (ds, V (PAIR (v1, v2)) :: evs, s)
-  | FST :: ds, V (PAIR (v, _)) :: evs, s -> (ds, V v :: evs, s)
-  | SND :: ds, V (PAIR (_, v)) :: evs, s -> (ds, V v :: evs, s)
-  | MK_INL :: ds, V v :: evs, s -> (ds, V (INL v) :: evs, s)
-  | MK_INR :: ds, V v :: evs, s -> (ds, V (INR v) :: evs, s)
-  | CASE (c1, _) :: ds, V (INL v) :: evs, s -> (c1 @ ds, V v :: evs, s)
-  | CASE (_, c2) :: ds, V (INR v) :: evs, s -> (c2 @ ds, V v :: evs, s)
-  | TEST (c1, _) :: ds, V (BOOL true) :: evs, s -> (c1 @ ds, evs, s)
-  | TEST (_, c2) :: ds, V (BOOL false) :: evs, s -> (c2 @ ds, evs, s)
-  | ASSIGN :: ds, V v :: V (REF a) :: evs, s -> (ds, V UNIT :: evs, assign s a v)
-  | DEREF :: ds, V (REF a) :: evs, s -> (ds, V (deref s a) :: evs, s)
+      (ds, V (Binary_op.to_fun op (v1, v2)) :: evs, s)
+  | MK_PAIR :: ds, V v2 :: V v1 :: evs, s -> (ds, V (`Pair (v1, v2)) :: evs, s)
+  | FST :: ds, V (`Pair (v, _)) :: evs, s -> (ds, V v :: evs, s)
+  | SND :: ds, V (`Pair (_, v)) :: evs, s -> (ds, V v :: evs, s)
+  | MK_INL :: ds, V v :: evs, s -> (ds, V (`Inl v) :: evs, s)
+  | MK_INR :: ds, V v :: evs, s -> (ds, V (`Inr v) :: evs, s)
+  | CASE (c1, _) :: ds, V (`Inl v) :: evs, s -> (c1 @ ds, V v :: evs, s)
+  | CASE (_, c2) :: ds, V (`Inr v) :: evs, s -> (c2 @ ds, V v :: evs, s)
+  | TEST (c1, _) :: ds, V (`Bool true) :: evs, s -> (c1 @ ds, evs, s)
+  | TEST (_, c2) :: ds, V (`Bool false) :: evs, s -> (c2 @ ds, evs, s)
+  | ASSIGN :: ds, V v :: V (`Ref a) :: evs, s ->
+      (ds, V `Unit :: evs, assign s a v)
+  | DEREF :: ds, V (`Ref a) :: evs, s -> (ds, V (deref s a) :: evs, s)
   | MK_REF :: ds, V v :: evs, s ->
       let a, s' = allocate s v in
-      (ds, V (REF a) :: evs, s')
-  | WHILE (_, _) :: ds, V (BOOL false) :: evs, s -> (ds, V UNIT :: evs, s)
-  | WHILE (c1, c2) :: ds, V (BOOL true) :: evs, s ->
+      (ds, V (`Ref a) :: evs, s')
+  | WHILE (_, _) :: ds, V (`Bool false) :: evs, s -> (ds, V `Unit :: evs, s)
+  | WHILE (c1, c2) :: ds, V (`Bool true) :: evs, s ->
       (c2 @ [ POP ] @ c1 @ [ WHILE (c1, c2) ] @ ds, evs, s)
   | MK_CLOSURE c :: ds, evs, s -> (ds, V (mk_fun (c, evs_to_env evs)) :: evs, s)
   | MK_REC (f, c) :: ds, evs, s ->
       (ds, V (mk_rec (f, c, evs_to_env evs)) :: evs, s)
-  | APPLY :: ds, V (CLOSURE (c, env)) :: V v :: evs, s ->
+  | APPLY :: ds, V (`Closure (c, env)) :: V v :: evs, s ->
       (c @ ds, V v :: EV env :: evs, s)
   | state -> complainf "step : bad state = %a\n" pp_interp_state state
 
@@ -276,15 +255,15 @@ let rec driver n state =
 let leave_scope = [ SWAP; POP ]
 
 (*
-   val compile : expr -> code
+   val compile : Ast.t -> code
 *)
-let rec compile = function
-  | Unit -> [ PUSH UNIT ]
-  | Integer n -> [ PUSH (INT n) ]
-  | Boolean b -> [ PUSH (BOOL b) ]
+let rec compile : Ast.t -> code = function
+  | Unit -> [ PUSH `Unit ]
+  | Integer n -> [ PUSH (`Int n) ]
+  | Boolean b -> [ PUSH (`Bool b) ]
   | Var x -> [ LOOKUP x ]
   | UnaryOp (op, e) -> compile e @ [ UNARY op ]
-  | Op (e1, op, e2) -> compile e1 @ compile e2 @ [ OPER op ]
+  | BinaryOp (e1, op, e2) -> compile e1 @ compile e2 @ [ OPER op ]
   | Pair (e1, e2) -> compile e1 @ compile e2 @ [ MK_PAIR ]
   | Fst e -> compile e @ [ FST ]
   | Snd e -> compile e @ [ SND ]

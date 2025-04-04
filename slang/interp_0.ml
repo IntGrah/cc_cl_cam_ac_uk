@@ -25,69 +25,39 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
     if the input expressin has passed static analysis, then such "run time"
     errors should never happen! (Can you prove that?)
 *)
-open Ast
-
-let complain = Errors.complain
-
 type address = int
 
-type store = address -> value
+type value =
+  [ `Ref of address
+  | `Int of int
+  | `Bool of bool
+  | `Unit
+  | `Pair of value * value
+  | `Inl of value
+  | `Inr of value
+  | `Fun of value -> store -> value * store ]
 
-and value =
-  | REF of address
-  | INT of int
-  | BOOL of bool
-  | UNIT
-  | PAIR of value * value
-  | INL of value
-  | INR of value
-  | FUN of (value * store -> value * store)
+and store = address -> value
 
-type env = var -> value
+type env = Ast.var -> value
 
 (* auxiliary functions *)
 
-let rec string_of_value = function
-  | REF a -> "address(" ^ string_of_int a ^ ")"
-  | BOOL b -> string_of_bool b
-  | INT n -> string_of_int n
-  | UNIT -> "()"
-  | PAIR (v1, v2) -> "(" ^ string_of_value v1 ^ ", " ^ string_of_value v2 ^ ")"
-  | INL v -> "inl(" ^ string_of_value v ^ ")"
-  | INR v -> "inr(" ^ string_of_value v ^ ")"
-  | FUN _ -> "FUNCTION( ... )"
+let rec string_of_value : value -> string = function
+  | `Ref a -> Format.sprintf "address(%d)" a
+  | `Bool b -> Printf.sprintf "%b" b
+  | `Int n -> Printf.sprintf "%d" n
+  | `Unit -> "()"
+  | `Pair (v1, v2) ->
+      Format.sprintf "(%s, %s)" (string_of_value v1) (string_of_value v2)
+  | `Inl v -> Format.sprintf "inl(%s)" (string_of_value v)
+  | `Inr v -> Format.sprintf "inr(%s)" (string_of_value v)
+  | `Fun _ -> "function( ... )"
 
 (* update : (env * binding) -> env
    update : (store * (address * value)) -> store
 *)
 let update (env, (x, v)) = fun y -> if x = y then v else env y
-
-let readint () =
-  let _ = print_string "input> " in
-  read_int ()
-
-let do_unary = function
-  | NOT, BOOL m -> BOOL (not m)
-  | NEG, INT m -> INT (-m)
-  | READ, UNIT -> INT (readint ())
-  | op, _ -> complain ("malformed unary operator: " ^ string_of_unary_oper op)
-
-let do_oper = function
-  | AND, BOOL m, BOOL n -> BOOL (m && n)
-  | OR, BOOL m, BOOL n -> BOOL (m || n)
-  | EQB, BOOL m, BOOL n -> BOOL (m = n)
-  | LT, INT m, INT n -> BOOL (m < n)
-  | EQI, INT m, INT n -> BOOL (m = n)
-  | ADD, INT m, INT n -> INT (m + n)
-  | SUB, INT m, INT n -> INT (m - n)
-  | MUL, INT m, INT n -> INT (m * n)
-  | DIV, INT m, INT n -> INT (m / n)
-  | op, _, _ -> complain ("malformed binary operator: " ^ string_of_oper op)
-
-let do_deref = function
-  | REF a, store -> (store a, store)
-  | _, _ -> complain "deref expecting address"
-
 let next_address = ref 0
 
 let new_address () =
@@ -95,111 +65,112 @@ let new_address () =
   next_address := a + 1;
   a
 
-let do_ref = function
-  | v, store ->
-      let a = new_address () in
-      (REF a, update (store, (a, v)))
-
-let do_assign a = function v, store -> (UNIT, update (store, (a, v)))
+let do_assign a = function v, store -> (`Unit, update (store, (a, v)))
 
 (*
     interpret : (expr * env * store) -> (value * store)
               : (expr * (var -> value) * address -> value) -> value
 *)
-let rec interpret (e, env, store) =
+let rec interpret (env : env) (e : Ast.t) (store : store) : value * store =
   match e with
-  | Unit -> (UNIT, store)
+  | Unit -> (`Unit, store)
   | Var x -> (env x, store)
-  | Integer n -> (INT n, store)
-  | Boolean b -> (BOOL b, store)
-  | Seq [] -> (UNIT, store) (* should not be seen ... *)
-  | Seq [ e ] -> interpret (e, env, store)
+  | Integer n -> (`Int n, store)
+  | Boolean b -> (`Bool b, store)
+  | Seq [] -> (`Unit, store) (* should not be seen ... *)
+  | Seq [ e ] -> interpret env e store
   | Seq (e :: rest) ->
-      let _, store1 = interpret (e, env, store) in
-      interpret (Seq rest, env, store1)
+      let _, store = interpret env e store in
+      interpret env (Seq rest) store
   | While (e1, e2) -> (
-      let v, store' = interpret (e1, env, store) in
+      let v, store' = interpret env e1 store in
       match v with
-      | BOOL true -> interpret (Seq [ e2; e ], env, store')
-      | BOOL false -> (UNIT, store')
-      | _ -> complain "runtime error.  Expecting a boolean!")
-  | Ref e -> do_ref (interpret (e, env, store))
-  | Deref e -> do_deref (interpret (e, env, store))
+      | `Bool true -> interpret env (Seq [ e2; e ]) store'
+      | `Bool false -> (`Unit, store')
+      | _ -> Errors.complain "runtime error.  Expecting a boolean!")
+  | Ref e ->
+      let v, store = interpret env e store in
+      let a = new_address () in
+      (`Ref a, update (store, (a, v)))
+  | Deref e -> (
+      let v, store = interpret env e store in
+      match v with
+      | `Ref a -> (store a, store)
+      | _ -> Errors.complain "runtime error.  Expecting an address!")
   | Assign (e1, e2) -> (
-      match interpret (e1, env, store) with
-      | REF a, store' -> do_assign a (interpret (e2, env, store'))
+      match interpret env e1 store with
+      | `Ref a, store -> do_assign a (interpret env e2 store)
       | _ ->
-          complain
+          Errors.complain
             "runtime error : expecting an address on left side of assignment")
   | UnaryOp (op, e) ->
-      let v, store' = interpret (e, env, store) in
-      (do_unary (op, v), store')
-  | Op (e1, op, e2) ->
-      let v1, store1 = interpret (e1, env, store) in
-      let v2, store2 = interpret (e2, env, store1) in
-      (do_oper (op, v1, v2), store2)
+      let v, store' = interpret env e store in
+      (Unary_op.to_fun op v, store')
+  | BinaryOp (e1, op, e2) ->
+      let v1, store1 = interpret env e1 store in
+      let v2, store2 = interpret env e2 store1 in
+      (Binary_op.to_fun op (v1, v2), store2)
   | If (e1, e2, e3) -> (
-      let v, store' = interpret (e1, env, store) in
+      let v, store' = interpret env e1 store in
       match v with
-      | BOOL true -> interpret (e2, env, store')
-      | BOOL false -> interpret (e3, env, store')
-      | _ -> complain "runtime error.  Expecting a boolean!")
+      | `Bool true -> interpret env e2 store'
+      | `Bool false -> interpret env e3 store'
+      | _ -> Errors.complain "runtime error.  Expecting a boolean!")
   | Pair (e1, e2) ->
-      let v1, store1 = interpret (e1, env, store) in
-      let v2, store2 = interpret (e2, env, store1) in
-      (PAIR (v1, v2), store2)
+      let v1, store1 = interpret env e1 store in
+      let v2, store2 = interpret env e2 store1 in
+      (`Pair (v1, v2), store2)
   | Fst e -> (
-      match interpret (e, env, store) with
-      | PAIR (v1, _), store' -> (v1, store')
-      | _ -> complain "runtime error.  Expecting a pair!")
+      match interpret env e store with
+      | `Pair (v1, _), store' -> (v1, store')
+      | _ -> Errors.complain "runtime error.  Expecting a pair!")
   | Snd e -> (
-      match interpret (e, env, store) with
-      | PAIR (_, v2), store' -> (v2, store')
-      | _ -> complain "runtime error.  Expecting a pair!")
+      match interpret env e store with
+      | `Pair (_, v2), store' -> (v2, store')
+      | _ -> Errors.complain "runtime error.  Expecting a pair!")
   | Inl e ->
-      let v, store' = interpret (e, env, store) in
-      (INL v, store')
+      let v, store' = interpret env e store in
+      (`Inl v, store')
   | Inr e ->
-      let v, store' = interpret (e, env, store) in
-      (INR v, store')
+      let v, store' = interpret env e store in
+      (`Inr v, store')
   | Case (e, (x1, e1), (x2, e2)) -> (
-      let v, store' = interpret (e, env, store) in
+      let v, store' = interpret env e store in
       match v with
-      | INL v' -> interpret (e1, update (env, (x1, v')), store')
-      | INR v' -> interpret (e2, update (env, (x2, v')), store')
-      | _ -> complain "runtime error.  Expecting inl or inr!")
+      | `Inl v' -> interpret (update (env, (x1, v'))) e1 store'
+      | `Inr v' -> interpret (update (env, (x2, v'))) e2 store'
+      | _ -> Errors.complain "runtime error.  Expecting inl or inr!")
   | Lambda (x, e) ->
-      (FUN (fun (v, s) -> interpret (e, update (env, (x, v)), s)), store)
+      (`Fun (fun v s -> interpret (update (env, (x, v))) e s), store)
   | App (e1, e2) -> (
-      let v2, store1 = interpret (e2, env, store) in
-      let v1, store2 = interpret (e1, env, store1) in
+      let v2, store1 = interpret env e2 store in
+      let v1, store2 = interpret env e1 store1 in
       match v1 with
-      | FUN f -> f (v2, store2)
-      | _ -> complain "runtime error.  Expecting a function!")
+      | `Fun f -> f v2 store2
+      | _ -> Errors.complain "runtime error.  Expecting a function!")
   | LetFun (f, (x, body), e) ->
       let new_env =
         update
-          ( env,
-            (f, FUN (fun (v, s) -> interpret (body, update (env, (x, v)), s)))
-          )
+          (env, (f, `Fun (fun v s -> interpret (update (env, (x, v))) body s)))
       in
-      interpret (e, new_env, store)
+      interpret new_env e store
   | LetRecFun (f, (x, body), e) ->
       let rec new_env g =
         (* a recursive environment! *)
         if g = f then
-          FUN (fun (v, s) -> interpret (body, update (new_env, (x, v)), s))
+          `Fun (fun v s -> interpret (update (new_env, (x, v))) body s)
         else env g
       in
-      interpret (e, new_env, store)
+      interpret new_env e store
 
 (* env_empty : env *)
-let empty_env = fun x -> complain (x ^ " is not defined!\n")
+let empty_env = fun x -> Errors.complain (x ^ " is not defined!\n")
 
 (* store_empty : env *)
-let empty_store = fun x -> complain (string_of_int x ^ " is not allocated!\n")
+let empty_store =
+ fun x -> Errors.complain (string_of_int x ^ " is not allocated!\n")
 
 (* interpret_top_level : expr -> value *)
 let interpret_top_level e =
-  let v, _ = interpret (e, empty_env, empty_store) in
+  let v, _ = interpret empty_env e empty_store in
   v

@@ -3,7 +3,7 @@ open Lexing
 let error file action s =
   Errors.complain ("\nERROR in " ^ file ^ " with " ^ action ^ " : " ^ s ^ "\n")
 
-let peek m e pp =
+let print_if_verbose m e pp =
   if Option.verbose_front then
     print_string
       (m ^ ":\n"
@@ -37,25 +37,23 @@ let parse (file, lexbuf) =
     try Parser.start Lexer.token lexbuf
     with Parsing.Parse_error -> parse_error file lexbuf
   in
-  let _ = peek "Parsed result" e Past.string_of_expr in
+  let _ = print_if_verbose "Parsed result" e Past.to_string in
   (file, e)
 
 (* perform static checks *)
 let check (file, e) =
   let e', _ =
-    try Static.infer [] e with Errors.Error s -> error file "static check" s
+    try Static.elab [] e with
+    | Errors.Error s -> error file "static check" s
+    | Static.Type_error _ -> error file "type check" "type error"
   in
-  let _ = peek "After static checks" e' Past.string_of_expr in
+  let _ = print_if_verbose "After static checks" e' Ast.to_string in
   e'
 
 (* translate from Past.expr to Ast.expr *)
-let translate e =
-  let e' = Past_to_ast.translate_expr e in
-  let _ = peek "After translation" e' Ast.string_of_expr in
-  e'
 
 (* the front end *)
-let front_end file = translate (check (parse (init_lexbuf file)))
+let front_end file = check (parse (init_lexbuf file))
 
 (* front end reading directly from string *)
 let initstrbuf str =
@@ -66,4 +64,4 @@ let initstrbuf str =
   in
   ("input", lexbuf)
 
-let front_end_from_string str = translate (check (parse (initstrbuf str)))
+let front_end_from_string str = check (parse (initstrbuf str))

@@ -5,8 +5,8 @@
 (library
  (name slanglib)
  (modules Front_end Interp_0 Interp_1 Interp_2 Interp_3 Jargon Jargon_to_x86
-   Ast Past Errors Option Free_vars Pptree Parser Lexer Static Tests
-   Past_to_ast)
+   Ast Past Unary_op Binary_op Type Errors Option Free_vars Pptree Parser
+   Lexer Static Tests)
  (preprocess
   (pps ppx_deriving_yojson)))
 

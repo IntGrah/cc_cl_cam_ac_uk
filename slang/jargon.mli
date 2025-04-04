@@ -37,8 +37,8 @@ type value_path = STACK_LOCATION of offset | HEAP_LOCATION of offset
 type instruction =
   | PUSH of stack_item (* modified *)
   | LOOKUP of value_path (* modified *)
-  | UNARY of Ast.unary_oper
-  | OPER of Ast.oper
+  | UNARY of Ast.unary_op
+  | OPER of Ast.binary_op
   | ASSIGN
   | SWAP
   | POP
@@ -81,12 +81,12 @@ type listing = instruction list
 
 val comp :
   (Past.var * value_path) list ->
-  Ast.expr ->
+  Ast.t ->
   instruction list * instruction list
 
-val compile : Ast.expr -> listing
+val compile : Ast.t -> listing
 val run : listing -> vm_state
-val interpret : Ast.expr -> vm_state
+val interpret : Ast.t -> vm_state
 val string_of_listing : listing -> string
 val string_of_stack_item : stack_item -> string
 val string_of_status : status_code -> string

@@ -4,24 +4,14 @@ module IntMap : Map.S with type key = int
 type address = int
 type var = string
 
-type value =
-  | REF of address
-  | INT of int
-  | BOOL of bool
-  | UNIT
-  | PAIR of value * value
-  | INL of value
-  | INR of value
-  | CLOSURE of closure
-  | REC_CLOSURE of code
-
+type value
 and closure = code * env
 
 and instruction =
   | PUSH of value
   | LOOKUP of var
-  | UNARY of Ast.unary_oper
-  | OPER of Ast.oper
+  | UNARY of Ast.unary_op
+  | OPER of Ast.binary_op
   | ASSIGN
   | SWAP
   | POP
@@ -54,9 +44,9 @@ type interp_state = code * env_value_stack * state
 val initial_state : state
 val initial_env : env_value_stack
 val step : interp_state -> interp_state
-val compile : Ast.expr -> code
+val compile : Ast.t -> code
 val driver : int -> interp_state -> value * state
-val interpret : Ast.expr -> value * state
+val interpret : Ast.t -> value * state
 val string_of_instruction : instruction -> string
 val string_of_value : value -> string
 val string_of_env_or_value : env_or_value -> string

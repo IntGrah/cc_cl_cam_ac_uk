@@ -1,6 +1,5 @@
 open Slanglib
 open Jargon
-open Ast
 
 type node_tp = H_INT | H_BOOL | H_UNIT | H_CI | H_HI | H_HEADER
 [@@deriving yojson]
@@ -179,8 +178,8 @@ let steps exp =
   (string_list_of_code vm, driver 1 vm)
 
 let string_list_of_instruction : instruction -> string = function
-  | UNARY op -> "\tUNARY " ^ string_of_uop op
-  | OPER op -> "\tOPER " ^ string_of_bop op
+  | UNARY op -> "\tUNARY " ^ Unary_op.to_string op
+  | OPER op -> "\tOPER " ^ Binary_op.to_string op
   | MK_PAIR -> "\tMK_PAIR"
   | FST -> "\tFST"
   | SND -> "\tSND"

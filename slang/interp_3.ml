@@ -15,7 +15,6 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
    --- compiler elimnates WHILE construct
 *)
 
-open Ast
 open Errors
 
 type address = int
@@ -23,21 +22,21 @@ type label = string
 type location = label * address option
 
 type value =
-  | REF of address
-  | INT of int
-  | BOOL of bool
-  | UNIT
-  | PAIR of value * value
-  | INL of value
-  | INR of value
-  | CLOSURE of location * env
-  | REC_CLOSURE of location
+  [ `Ref of address
+  | `Int of int
+  | `Bool of bool
+  | `Unit
+  | `Pair of value * value
+  | `Inl of value
+  | `Inr of value
+  | `Closure of location * env
+  | `Rec_closure of location ]
 
 and instruction =
   | PUSH of value
   | LOOKUP of Ast.var
-  | UNARY of Ast.unary_oper
-  | OPER of Ast.oper
+  | UNARY of Ast.unary_op
+  | OPER of Ast.binary_op
   | ASSIGN
   | SWAP
   | POP
@@ -60,7 +59,7 @@ and instruction =
   | HALT
 
 and code = instruction list
-and binding = var * value
+and binding = Ast.var * value
 and env = binding list
 
 type env_or_value =
@@ -81,7 +80,7 @@ let rec lookup (env, x) =
       if x = y then
         Some
           (match v with
-          | REC_CLOSURE loc -> CLOSURE (loc, (y, REC_CLOSURE loc) :: rest)
+          | `Rec_closure loc -> `Closure (loc, (y, `Rec_closure loc) :: rest)
           | _ -> v)
       else lookup (rest, x)
 
@@ -109,16 +108,16 @@ let pp_list fmt sep f l =
   in
   pr fmt "@[[%a]@]" (aux f) l
 
-let rec pp_value fmt = function
-  | REF a -> pr fmt "REF(%d)" a
-  | BOOL b -> pr fmt "%b" b
-  | INT n -> pr fmt "%d" n
-  | UNIT -> pr fmt "UNIT"
-  | PAIR (v1, v2) -> pr fmt "(@[%a,@ %a)@]" pp_value v1 pp_value v2
-  | INL v -> pr fmt "inl(%a)" pp_value v
-  | INR v -> pr fmt "inr(%a)" pp_value v
-  | CLOSURE (loc, c) -> pr fmt "CLOSURE(%a)" pp_closure (loc, c)
-  | REC_CLOSURE loc -> pr fmt "REC_CLOSURE(%a)" pp_location loc
+let rec pp_value fmt : value -> unit = function
+  | `Ref a -> pr fmt "REF(%d)" a
+  | `Bool b -> pr fmt "%b" b
+  | `Int n -> pr fmt "%d" n
+  | `Unit -> pr fmt "UNIT"
+  | `Pair (v1, v2) -> pr fmt "(@[%a,@ %a)@]" pp_value v1 pp_value v2
+  | `Inl v -> pr fmt "inl(%a)" pp_value v
+  | `Inr v -> pr fmt "inr(%a)" pp_value v
+  | `Closure (loc, c) -> pr fmt "CLOSURE(%a)" pp_closure (loc, c)
+  | `Rec_closure loc -> pr fmt "REC_CLOSURE(%a)" pp_location loc
 
 and pp_closure fmt (loc, env) = pr fmt "(%a, %a)" pp_location loc pp_env env
 and pp_env fmt env = pp_list fmt ",@\n " pp_binding env
@@ -129,8 +128,8 @@ and pp_location fmt = function
   | l, Some i -> pr fmt "%s = %d" l i
 
 and pp_instruction fmt = function
-  | UNARY op -> pr fmt "  UNARY %s" (string_of_uop op)
-  | OPER op -> pr fmt "  OPER %s" (string_of_bop op)
+  | UNARY op -> pr fmt "  UNARY %a" Unary_op.pp op
+  | OPER op -> pr fmt "  OPER %a" Binary_op.pp op
   | MK_PAIR -> pr fmt "  MK_PAIR"
   | FST -> pr fmt "  FST"
   | SND -> pr fmt "  SND"
@@ -183,7 +182,7 @@ let string_of_installed_code () =
   Format.asprintf "%a" (fun f () -> pp_installed_code f) ()
 
 let get_instruction cp = Array.get !installed cp
-let heap = Array.make Option.heap_max (INT 0)
+let heap = Array.make Option.heap_max (`Int 0)
 let next_address = ref 0
 
 let new_address () =
@@ -203,28 +202,6 @@ let pp_state fmt (cp, evs) =
     (get_instruction cp) pp_env_value_stack evs
     (if !next_address = 0 then "" else string_of_heap ())
 
-let readint () =
-  let _ = print_string "input> " in
-  read_int ()
-
-let do_unary = function
-  | NOT, BOOL m -> BOOL (not m)
-  | NEG, INT m -> INT (-m)
-  | READ, UNIT -> INT (readint ())
-  | op, _ -> complainf "malformed unary operator: %s" (string_of_unary_oper op)
-
-let do_oper = function
-  | AND, BOOL m, BOOL n -> BOOL (m && n)
-  | OR, BOOL m, BOOL n -> BOOL (m || n)
-  | EQB, BOOL m, BOOL n -> BOOL (m = n)
-  | LT, INT m, INT n -> BOOL (m < n)
-  | EQI, INT m, INT n -> BOOL (m = n)
-  | ADD, INT m, INT n -> INT (m + n)
-  | SUB, INT m, INT n -> INT (m - n)
-  | MUL, INT m, INT n -> INT (m * n)
-  | DIV, INT m, INT n -> INT (m / n)
-  | op, _, _ -> complainf "malformed binary operator: %s" (string_of_oper op)
-
 let step (cp, evs) =
   match (get_instruction cp, evs) with
   | PUSH v, evs -> (cp + 1, V v :: evs)
@@ -232,29 +209,31 @@ let step (cp, evs) =
   | SWAP, s1 :: s2 :: evs -> (cp + 1, s2 :: s1 :: evs)
   | BIND x, V v :: evs -> (cp + 1, EV [ (x, v) ] :: evs)
   | LOOKUP x, evs -> (cp + 1, V (search (evs, x)) :: evs)
-  | UNARY op, V v :: evs -> (cp + 1, V (do_unary (op, v)) :: evs)
-  | OPER op, V v2 :: V v1 :: evs -> (cp + 1, V (do_oper (op, v1, v2)) :: evs)
-  | MK_PAIR, V v2 :: V v1 :: evs -> (cp + 1, V (PAIR (v1, v2)) :: evs)
-  | FST, V (PAIR (v, _)) :: evs -> (cp + 1, V v :: evs)
-  | SND, V (PAIR (_, v)) :: evs -> (cp + 1, V v :: evs)
-  | MK_INL, V v :: evs -> (cp + 1, V (INL v) :: evs)
-  | MK_INR, V v :: evs -> (cp + 1, V (INR v) :: evs)
-  | CASE (_, Some _), V (INL v) :: evs -> (cp + 1, V v :: evs)
-  | CASE (_, Some i), V (INR v) :: evs -> (i, V v :: evs)
-  | TEST (_, Some _), V (BOOL true) :: evs -> (cp + 1, evs)
-  | TEST (_, Some i), V (BOOL false) :: evs -> (i, evs)
-  | ASSIGN, V v :: V (REF a) :: evs ->
+  | UNARY op, V v :: evs -> (cp + 1, V (Unary_op.to_fun op v) :: evs)
+  | OPER op, V v2 :: V v1 :: evs ->
+      (cp + 1, V (Binary_op.to_fun op (v1, v2)) :: evs)
+  | MK_PAIR, V v2 :: V v1 :: evs -> (cp + 1, V (`Pair (v1, v2)) :: evs)
+  | FST, V (`Pair (v, _)) :: evs -> (cp + 1, V v :: evs)
+  | SND, V (`Pair (_, v)) :: evs -> (cp + 1, V v :: evs)
+  | MK_INL, V v :: evs -> (cp + 1, V (`Inl v) :: evs)
+  | MK_INR, V v :: evs -> (cp + 1, V (`Inr v) :: evs)
+  | CASE (_, Some _), V (`Inl v) :: evs -> (cp + 1, V v :: evs)
+  | CASE (_, Some i), V (`Inr v) :: evs -> (i, V v :: evs)
+  | TEST (_, Some _), V (`Bool true) :: evs -> (cp + 1, evs)
+  | TEST (_, Some i), V (`Bool false) :: evs -> (i, evs)
+  | ASSIGN, V v :: V (`Ref a) :: evs ->
       heap.(a) <- v;
-      (cp + 1, V UNIT :: evs)
-  | DEREF, V (REF a) :: evs -> (cp + 1, V heap.(a) :: evs)
+      (cp + 1, V `Unit :: evs)
+  | DEREF, V (`Ref a) :: evs -> (cp + 1, V heap.(a) :: evs)
   | MK_REF, V v :: evs ->
       let a = new_address () in
       heap.(a) <- v;
-      (cp + 1, V (REF a) :: evs)
-  | MK_CLOSURE loc, evs -> (cp + 1, V (CLOSURE (loc, evs_to_env evs)) :: evs)
+      (cp + 1, V (`Ref a) :: evs)
+  | MK_CLOSURE loc, evs -> (cp + 1, V (`Closure (loc, evs_to_env evs)) :: evs)
   | MK_REC (f, loc), evs ->
-      (cp + 1, V (CLOSURE (loc, (f, REC_CLOSURE loc) :: evs_to_env evs)) :: evs)
-  | APPLY, V (CLOSURE ((_, Some i), env)) :: V v :: evs ->
+      ( cp + 1,
+        V (`Closure (loc, (f, `Rec_closure loc) :: evs_to_env evs)) :: evs )
+  | APPLY, V (`Closure ((_, Some i), env)) :: V v :: evs ->
       (i, V v :: EV env :: RA (cp + 1) :: evs)
   (* new intructions *)
   | RETURN, V v :: _ :: RA i :: evs -> (i, V v :: evs)
@@ -275,15 +254,15 @@ let new_label =
   in
   get
 
-let rec comp = function
-  | Unit -> ([], [ PUSH UNIT ])
-  | Integer n -> ([], [ PUSH (INT n) ])
-  | Boolean b -> ([], [ PUSH (BOOL b) ])
+let rec comp : Ast.t -> code * code = function
+  | Unit -> ([], [ PUSH `Unit ])
+  | Integer n -> ([], [ PUSH (`Int n) ])
+  | Boolean b -> ([], [ PUSH (`Bool b) ])
   | Var x -> ([], [ LOOKUP x ])
   | UnaryOp (op, e) ->
       let defs, c = comp e in
       (defs, c @ [ UNARY op ])
-  | Op (e1, op, e2) ->
+  | BinaryOp (e1, op, e2) ->
       let defs1, c1 = comp e1 in
       let defs2, c2 = comp e2 in
       (defs1 @ defs2, c1 @ c2 @ [ OPER op ])
@@ -349,7 +328,7 @@ let rec comp = function
         [ LABEL test_label ] @ c1
         @ [ TEST (end_label, None) ]
         @ c2
-        @ [ POP; GOTO (test_label, None); LABEL end_label; PUSH UNIT ] )
+        @ [ POP; GOTO (test_label, None); LABEL end_label; PUSH `Unit ] )
   | Assign (e1, e2) ->
       let defs1, c1 = comp e1 in
       let defs2, c2 = comp e2 in
@@ -465,4 +444,4 @@ let reset =
  fun () ->
   next_address := 0;
   label_ref := 0;
-  Array.fill heap 0 (Array.length heap) (INT 0)
+  Array.fill heap 0 (Array.length heap) (`Int 0)

@@ -1,34 +1,33 @@
 type var = string
-type oper = ADD | MUL | DIV | SUB | LT | AND | OR | EQB | EQI
-type unary_oper = NEG | NOT | READ
+type unary_op = [ `Neg | `Not | `Read ]
 
-type expr =
+type binary_op = [ `Add | `Sub | `Mul | `Div | `Lt | `And | `Or | `Eqi | `Eqb ]
+
+type t =
   | Unit
   | Var of var
   | Integer of int
   | Boolean of bool
-  | UnaryOp of unary_oper * expr
-  | Op of expr * oper * expr
-  | If of expr * expr * expr
-  | Pair of expr * expr
-  | Fst of expr
-  | Snd of expr
-  | Inl of expr
-  | Inr of expr
-  | Case of expr * lambda * lambda
-  | While of expr * expr
-  | Seq of expr list
-  | Ref of expr
-  | Deref of expr
-  | Assign of expr * expr
+  | UnaryOp of unary_op * t
+  | BinaryOp of t * binary_op * t
+  | If of t * t * t
+  | Pair of t * t
+  | Fst of t
+  | Snd of t
+  | Inl of t
+  | Inr of t
+  | Case of t * lambda * lambda
+  | While of t * t
+  | Seq of t list
+  | Ref of t
+  | Deref of t
+  | Assign of t * t
   | Lambda of lambda
-  | App of expr * expr
-  | LetFun of var * lambda * expr
-  | LetRecFun of var * lambda * expr
+  | App of t * t
+  | LetFun of var * lambda * t
+  | LetRecFun of var * lambda * t
 
-and lambda = var * expr
-
-open Format
+and lambda = var * t
 
 (*
    Documentation of Format can be found here:
@@ -36,130 +35,74 @@ open Format
    http://caml.inria.fr/pub/docs/manual-ocaml/libref/Format.html
 *)
 
-let pp_uop = function NEG -> "-" | NOT -> "~" | READ -> "read"
-
-let pp_bop = function
-  | ADD -> "+"
-  | MUL -> "*"
-  | DIV -> "/"
-  | SUB -> "-"
-  | LT -> "<"
-  | EQI -> "eqi"
-  | EQB -> "eqb"
-  | AND -> "&&"
-  | OR -> "||"
-
-let string_of_oper = pp_bop
-let string_of_unary_oper = pp_uop
-let fstring ppf s = fprintf ppf "%s" s
-let pp_unary ppf t = fstring ppf (pp_uop t)
-let pp_binary ppf t = fstring ppf (pp_bop t)
-
-let rec pp_expr ppf = function
-  | Unit -> fstring ppf "()"
-  | Var x -> fstring ppf x
-  | Integer n -> fstring ppf (string_of_int n)
-  | Boolean b -> fstring ppf (string_of_bool b)
-  | UnaryOp (op, e) -> fprintf ppf "%a(%a)" pp_unary op pp_expr e
-  | Op (e1, op, e2) ->
-      fprintf ppf "(%a %a %a)" pp_expr e1 pp_binary op pp_expr e2
-  | If (e1, e2, e3) ->
-      fprintf ppf "@[if %a then %a else %a @]" pp_expr e1 pp_expr e2 pp_expr e3
-  | Pair (e1, e2) -> fprintf ppf "(%a, %a)" pp_expr e1 pp_expr e2
-  | Fst e -> fprintf ppf "fst(%a)" pp_expr e
-  | Snd e -> fprintf ppf "snd(%a)" pp_expr e
-  | Inl e -> fprintf ppf "inl(%a)" pp_expr e
-  | Inr e -> fprintf ppf "inr(%a)" pp_expr e
-  | Case (e, (x1, e1), (x2, e2)) ->
-      fprintf ppf "@[<2>case %a of@ | inl %a -> %a @ | inr %a -> %a end@]"
-        pp_expr e fstring x1 pp_expr e1 fstring x2 pp_expr e2
-  | Lambda (x, e) -> fprintf ppf "(fun %a -> %a)" fstring x pp_expr e
-  | App (e1, e2) -> fprintf ppf "%a %a" pp_expr e1 pp_expr e2
-  | Seq el -> fprintf ppf "begin %a end" pp_expr_list el
-  | While (e1, e2) -> fprintf ppf "while %a do %a end" pp_expr e1 pp_expr e2
-  | Ref e -> fprintf ppf "ref(%a)" pp_expr e
-  | Deref e -> fprintf ppf "!(%a)" pp_expr e
-  | Assign (e1, e2) -> fprintf ppf "(%a := %a)" pp_expr e1 pp_expr e2
-  | LetFun (f, (x, e1), e2) ->
-      fprintf ppf "@[let %a(%a) =@ %a @ in %a @ end@]" fstring f fstring x
-        pp_expr e1 pp_expr e2
-  | LetRecFun (f, (x, e1), e2) ->
-      fprintf ppf "@[letrec %a(%a) =@ %a @ in %a @ end@]" fstring f fstring x
-        pp_expr e1 pp_expr e2
-
-and pp_expr_list ppf = function
-  | [] -> ()
-  | [ e ] -> pp_expr ppf e
-  | e :: rest -> fprintf ppf "%a; %a" pp_expr e pp_expr_list rest
-
-let print_expr e =
-  let _ = pp_expr std_formatter e in
-  print_flush ()
-
-let eprint_expr e =
-  let _ = pp_expr err_formatter e in
-  pp_print_flush err_formatter ()
-
-(* useful for debugging *)
-
-let string_of_uop = function NEG -> "NEG" | NOT -> "NOT" | READ -> "READ"
-
-let string_of_bop = function
-  | ADD -> "ADD"
-  | MUL -> "MUL"
-  | DIV -> "DIV"
-  | SUB -> "SUB"
-  | LT -> "LT"
-  | EQI -> "EQI"
-  | EQB -> "EQB"
-  | AND -> "AND"
-  | OR -> "OR"
-
-let mk_con con l =
-  let rec aux carry = function
-    | [] -> carry ^ ")"
-    | [ s ] -> carry ^ s ^ ")"
-    | s :: rest -> aux (carry ^ s ^ ", ") rest
-  in
-  aux (con ^ "(") l
-
-let rec string_of_expr = function
+let rec to_string = function
   | Unit -> "Unit"
-  | Var x -> mk_con "Var" [ x ]
-  | Integer n -> mk_con "Integer" [ string_of_int n ]
-  | Boolean b -> mk_con "Boolean" [ string_of_bool b ]
-  | UnaryOp (op, e) -> mk_con "UnaryOp" [ string_of_uop op; string_of_expr e ]
-  | Op (e1, op, e2) ->
-      mk_con "Op" [ string_of_expr e1; string_of_bop op; string_of_expr e2 ]
+  | Var x -> Format.sprintf "Var %s" x
+  | Integer n -> Format.sprintf "Integer %d" n
+  | Boolean b -> Format.sprintf "Boolean %b" b
+  | UnaryOp (op, e) ->
+      Format.sprintf "UnaryOp(%s, %s)" (Unary_op.to_string op) (to_string e)
+  | BinaryOp (e1, op, e2) ->
+      Format.sprintf "Op(%s, %s, %s)" (to_string e1) (Binary_op.to_string op)
+        (to_string e2)
   | If (e1, e2, e3) ->
-      mk_con "If" [ string_of_expr e1; string_of_expr e2; string_of_expr e3 ]
-  | Pair (e1, e2) -> mk_con "Pair" [ string_of_expr e1; string_of_expr e2 ]
-  | Fst e -> mk_con "Fst" [ string_of_expr e ]
-  | Snd e -> mk_con "Snd" [ string_of_expr e ]
-  | Inl e -> mk_con "Inl" [ string_of_expr e ]
-  | Inr e -> mk_con "Inr" [ string_of_expr e ]
-  | Lambda (x, e) -> mk_con "Lambda" [ x; string_of_expr e ]
-  | App (e1, e2) -> mk_con "App" [ string_of_expr e1; string_of_expr e2 ]
-  | Seq el -> mk_con "Seq" [ string_of_expr_list el ]
-  | While (e1, e2) -> mk_con "While" [ string_of_expr e1; string_of_expr e2 ]
-  | Ref e -> mk_con "Ref" [ string_of_expr e ]
-  | Deref e -> mk_con "Deref" [ string_of_expr e ]
-  | Assign (e1, e2) -> mk_con "Assign" [ string_of_expr e1; string_of_expr e2 ]
-  | LetFun (f, (x, e1), e2) ->
-      mk_con "LetFun"
-        [ f; mk_con "" [ x; string_of_expr e1 ]; string_of_expr e2 ]
-  | LetRecFun (f, (x, e1), e2) ->
-      mk_con "LetRecFun"
-        [ f; mk_con "" [ x; string_of_expr e1 ]; string_of_expr e2 ]
+      Format.sprintf "If(%s, %s, %s)" (to_string e1) (to_string e2)
+        (to_string e3)
+  | Pair (e1, e2) -> Format.sprintf "Pair(%s, %s)" (to_string e1) (to_string e2)
+  | Fst e -> Format.sprintf "Fst(%s)" (to_string e)
+  | Snd e -> Format.sprintf "Snd(%s)" (to_string e)
+  | Inl e -> Format.sprintf "Inl(%s)" (to_string e)
+  | Inr e -> Format.sprintf "Inr(%s)" (to_string e)
   | Case (e, (x1, e1), (x2, e2)) ->
-      mk_con "Case"
-        [
-          string_of_expr e;
-          mk_con "" [ x1; string_of_expr e1 ];
-          mk_con "" [ x2; string_of_expr e2 ];
-        ]
+      Format.sprintf "Case(%s, (%s, %s), (%s, %s))" (to_string e) x1
+        (to_string e1) x2 (to_string e2)
+  | While (e1, e2) ->
+      Format.sprintf "While(%s, %s)" (to_string e1) (to_string e2)
+  | Seq el ->
+      Format.sprintf "Seq(%s)" (List.map to_string el |> String.concat "; ")
+  | Ref e -> Format.sprintf "Ref(%s)" (to_string e)
+  | Deref e -> Format.sprintf "Deref(%s)" (to_string e)
+  | Assign (e1, e2) ->
+      Format.sprintf "Assign(%s, %s)" (to_string e1) (to_string e2)
+  | Lambda (x, e) -> Format.sprintf "Lambda(%s, %s)" x (to_string e)
+  | App (e1, e2) -> Format.sprintf "App(%s, %s)" (to_string e1) (to_string e2)
+  | LetFun (f, (x, e1), e2) ->
+      Format.sprintf "LetFun(%s, (%s, %s), %s)" f x (to_string e1)
+        (to_string e2)
+  | LetRecFun (f, (x, e1), e2) ->
+      Format.sprintf "LetRecFun(%s, (%s, %s), %s)" f x (to_string e1)
+        (to_string e2)
 
-and string_of_expr_list = function
-  | [] -> ""
-  | [ e ] -> string_of_expr e
-  | e :: rest -> string_of_expr e ^ "; " ^ string_of_expr_list rest
+let rec pp ppf =
+  let open Format in
+  function
+  | Unit -> fprintf ppf "()"
+  | Var x -> fprintf ppf "%s" x
+  | Integer n -> fprintf ppf "%d" n
+  | Boolean b -> fprintf ppf "%b" b
+  | UnaryOp (op, e) -> fprintf ppf "%a(%a)" Unary_op.pp op pp e
+  | BinaryOp (e1, op, e2) ->
+      fprintf ppf "(%a %a %a)" pp e1 Binary_op.pp op pp e2
+  | If (e1, e2, e3) ->
+      fprintf ppf "@[if %a then %a else %a @]" pp e1 pp e2 pp e3
+  | Pair (e1, e2) -> fprintf ppf "(%a, %a)" pp e1 pp e2
+  | Fst e -> fprintf ppf "fst(%a)" pp e
+  | Snd e -> fprintf ppf "snd(%a)" pp e
+  | Inl e -> fprintf ppf "inl(%a)" pp e
+  | Inr e -> fprintf ppf "inr(%a)" pp e
+  | Case (e, (x1, e1), (x2, e2)) ->
+      fprintf ppf "@[<2>case %a of@ | inl %s -> %a @ | inr %s -> %a end@]" pp e
+        x1 pp e1 x2 pp e2
+  | Seq [] -> ()
+  | Seq [ e ] -> pp ppf e
+  | Seq (e :: rest) -> fprintf ppf "%a; %a" pp e pp (Seq rest)
+  | While (e1, e2) -> fprintf ppf "while %a do %a" pp e1 pp e2
+  | Ref e -> fprintf ppf "ref %a" pp e
+  | Deref e -> fprintf ppf "!%a" pp e
+  | Assign (e1, e2) -> fprintf ppf "(%a := %a)" pp e1 pp e2
+  | Lambda (x, e) -> fprintf ppf "(fun %s -> %a)" x pp e
+  | App (e1, e2) -> fprintf ppf "%a %a" pp e1 pp e2
+  | LetFun (f, (x, e1), e2) ->
+      fprintf ppf "@[let %s %s =@ %a @ in %a @ end@]" f x pp e1 pp e2
+  | LetRecFun (f, (x, e1), e2) ->
+      fprintf ppf "@[letrec %s %s =@ %a @ in %a @ end@]" f x pp e1 pp e2
