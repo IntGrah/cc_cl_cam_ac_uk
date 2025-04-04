@@ -2,7 +2,7 @@
   open Parser
   open Lexing
 
-(* next_line copied from  Ch. 16 of "Real Workd Ocaml" *)
+(* next_line copied from  Ch. 16 of "Real World Ocaml" *)
 let next_line lexbuf =
   let pos = lexbuf.lex_curr_p in
   lexbuf.lex_curr_p <-
@@ -74,5 +74,3 @@ and comment = parse
   | "(*" {comment lexbuf; comment lexbuf }
   | eof { Errors.complain "ERROR Lexer : Comment not terminated" }
   | _ { comment lexbuf }
-
-
