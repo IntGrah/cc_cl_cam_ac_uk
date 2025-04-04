@@ -282,7 +282,7 @@ let step_5 = function
 
 *)
 let rec driver_5 n state =
-  let _ = if !verbose then print_string (string_of_state5 n state) else () in
+  if !verbose then print_string (string_of_state5 n state);
   match state with APPLY ([], v) -> v | _ -> driver_5 (n + 1) (step_5 state)
 
 (* eval_5 : expr -> int *)
@@ -364,7 +364,7 @@ let step_6 = function
 
 (* driver_6 : state_6 -> int *)
 let rec driver_6 n state =
-  let _ = if !verbose then print_string (string_of_state6 n state) else () in
+  if !verbose then print_string (string_of_state6 n state);
   match state with [], [ v ] -> v | _ -> driver_6 (n + 1) (step_6 state)
 
 let eval_6 e = driver_6 1 ([ E e ], [])
@@ -579,7 +579,7 @@ let string_of_state7 n = function
 
 (* driver_7 : state_7 -> int *)
 let rec driver_7 n state =
-  let _ = if !verbose then print_string (string_of_state7 n state) else () in
+  if !verbose then print_string (string_of_state7 n state);
   match state with [], [ v ] -> v | _ -> driver_7 (n + 1) (step_7 state)
 
 let eval_7 e = driver_7 1 (compile e, [])

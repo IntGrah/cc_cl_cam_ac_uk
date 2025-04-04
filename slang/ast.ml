@@ -9,7 +9,7 @@ module Unary_op = struct
     | Read -> (
         function
         | `Unit ->
-            print_string "input>";
+            print_string ">>>";
             `Int (read_int ())
         | _ -> failwith "")
 
@@ -84,12 +84,11 @@ type t =
 
 and lambda = var * t
 
-(*
-   Documentation of Format can be found here:
-   http://caml.inria.fr/resources/doc/guides/format.en.html
-   http://caml.inria.fr/pub/docs/manual-ocaml/libref/Format.html
-*)
+(** Documentation of Format can be found here:
 
+    http://caml.inria.fr/resources/doc/guides/format.en.html
+
+    http://caml.inria.fr/pub/docs/manual-ocaml/libref/Format.html *)
 let rec to_string = function
   | Unit -> "Unit"
   | Var x -> Format.sprintf "Var %s" x

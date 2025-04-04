@@ -188,7 +188,7 @@ let verbose = ref true
 
 *)
 let rec eval_steps n state =
-  let _ = if !verbose then print_state n state else () in
+  if !verbose then print_state n state;
   match state with APPL, a, [] -> a | _ -> eval_steps (n + 1) (step state)
 
 (*  fib_5 : int -> int *)

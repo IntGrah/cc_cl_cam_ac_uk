@@ -10,7 +10,6 @@ let print_if_verbose m e pp =
       ^ (if Option.verbose_tree then Pptree.pp_no_bracket else fun x -> x)
           (pp e)
       ^ "\n")
-  else ()
 
 let parse_error file lexbuf =
   let pos = lexbuf.lex_curr_p in

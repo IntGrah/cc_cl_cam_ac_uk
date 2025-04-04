@@ -219,7 +219,8 @@ let step = function
   | INSPECT (Lambda (x, body), env, k) -> COMPUTE (k, mk_fun (x, body, env))
   (* COMPUTE --> COMPUTE *)
   | COMPUTE (UNARY op :: k, v) -> COMPUTE (k, Ast.Unary_op.to_fun op v)
-  | COMPUTE (OPER (op, v1) :: k, v2) -> COMPUTE (k, Ast.Binary_op.to_fun op (v1, v2))
+  | COMPUTE (OPER (op, v1) :: k, v2) ->
+      COMPUTE (k, Ast.Binary_op.to_fun op (v1, v2))
   | COMPUTE (MKPAIR v1 :: k, v2) -> COMPUTE (k, `Pair (v1, v2))
   | COMPUTE (FST :: k, `Pair (v, _)) -> COMPUTE (k, v)
   | COMPUTE (SND :: k, `Pair (_, v)) -> COMPUTE (k, v)
@@ -259,7 +260,6 @@ let rec driver n state =
     if Option.verbose then
       print_string
         ("\nstate " ^ string_of_int n ^ " = \n" ^ string_of_state state ^ "\n")
-    else ()
   in
   match state with COMPUTE ([], v) -> v | _ -> driver (n + 1) (step state)
 

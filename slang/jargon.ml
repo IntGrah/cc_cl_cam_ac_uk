@@ -521,7 +521,6 @@ let rec driver n vm =
       print_string
         ("========== state " ^ string_of_int n ^ " ==========\n"
        ^ string_of_state vm ^ "\n")
-    else ()
   in
   if vm.status = Running then driver (n + 1) (step vm) else vm
 
@@ -561,7 +560,6 @@ let initial_state l =
       print_string
         ("\nInstalled Code = \n"
         ^ string_of_installed_code (code_array, c_bound))
-    else ()
   in
   {
     stack_bound = Option.stack_max;
@@ -753,7 +751,6 @@ let compile e =
   let _ =
     if Option.verbose then
       print_string ("\nCompiled Code = \n" ^ string_of_listing result)
-    else ()
   in
   result
 
