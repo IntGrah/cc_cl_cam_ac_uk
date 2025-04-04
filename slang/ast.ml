@@ -1,15 +1,70 @@
 type var = string
-type unary_op = [ `Neg | `Not | `Read ]
 
-type binary_op = [ `Add | `Sub | `Mul | `Div | `Lt | `And | `Or | `Eqi | `Eqb ]
+module Unary_op = struct
+  type t = Neg | Not | Read
+
+  let to_fun = function
+    | Neg -> ( function `Int i -> `Int (-i) | _ -> failwith "")
+    | Not -> ( function `Bool i -> `Bool (not i) | _ -> failwith "")
+    | Read -> (
+        function
+        | `Unit ->
+            print_string "input>";
+            `Int (read_int ())
+        | _ -> failwith "")
+
+  let to_string = function Neg -> "Neg" | Not -> "Not" | Read -> "Read"
+
+  let pp ppf = function
+    | Neg -> Format.fprintf ppf "-"
+    | Not -> Format.fprintf ppf "~"
+    | Read -> Format.fprintf ppf "read"
+end
+
+module Binary_op = struct
+  type t = Add | Sub | Mul | Div | Lt | And | Or | Eqi | Eqb
+
+  let to_fun = function
+    | Add -> ( function `Int m, `Int n -> `Int (m + n) | _ -> failwith "")
+    | Sub -> ( function `Int m, `Int n -> `Int (m - n) | _ -> failwith "")
+    | Mul -> ( function `Int m, `Int n -> `Int (m * n) | _ -> failwith "")
+    | Div -> ( function `Int m, `Int n -> `Int (m + n) | _ -> failwith "")
+    | Lt -> ( function `Int m, `Int n -> `Bool (m < n) | _ -> failwith "")
+    | And -> ( function `Bool m, `Bool n -> `Bool (m && n) | _ -> failwith "")
+    | Or -> ( function `Bool m, `Bool n -> `Bool (m || n) | _ -> failwith "")
+    | Eqi -> ( function `Int m, `Int n -> `Bool (m = n) | _ -> failwith "")
+    | Eqb -> ( function `Bool m, `Bool n -> `Bool (m = n) | _ -> failwith "")
+
+  let to_string = function
+    | Add -> "Add"
+    | Sub -> "Sub"
+    | Mul -> "Mul"
+    | Div -> "Div"
+    | Lt -> "Lt"
+    | And -> "And"
+    | Or -> "Or"
+    | Eqi -> "Eqi"
+    | Eqb -> "Eqb"
+
+  let pp ppf = function
+    | Add -> Format.fprintf ppf "+"
+    | Sub -> Format.fprintf ppf "-"
+    | Mul -> Format.fprintf ppf "*"
+    | Div -> Format.fprintf ppf "/"
+    | Lt -> Format.fprintf ppf "<"
+    | And -> Format.fprintf ppf "&&"
+    | Or -> Format.fprintf ppf "||"
+    | Eqi -> Format.fprintf ppf "eqi"
+    | Eqb -> Format.fprintf ppf "eqb"
+end
 
 type t =
   | Unit
   | Var of var
   | Integer of int
   | Boolean of bool
-  | UnaryOp of unary_op * t
-  | BinaryOp of t * binary_op * t
+  | UnaryOp of Unary_op.t * t
+  | BinaryOp of t * Binary_op.t * t
   | If of t * t * t
   | Pair of t * t
   | Fst of t

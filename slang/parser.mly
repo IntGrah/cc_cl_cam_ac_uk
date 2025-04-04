@@ -55,7 +55,7 @@ simple_expr: /* alternate name: expr2 */
 | FALSE                              { { loc = get_loc (); expr = Boolean false } }
 | LPAREN expr RPAREN                 { $2 }
 | LPAREN expr COMMA expr RPAREN      { { loc = get_loc (); expr = Pair ($2, $4) } }
-| NOT simple_expr                    { { loc = get_loc (); expr = UnaryOp (`Not, $2) } }
+| NOT simple_expr                    { { loc = get_loc (); expr = UnaryOp (Not, $2) } }
 | BANG simple_expr                   { { loc = get_loc (); expr = Deref $2 } }
 | REF simple_expr                    { { loc = get_loc (); expr = Ref $2 } }
 
@@ -68,15 +68,15 @@ simple_expr: /* alternate name: expr2 */
 
 expr1:
 | simple_expr                        { $1 }
-| SUB expr1 %prec UNIT               { { loc = get_loc (); expr = UnaryOp (`Neg, $2) } }
-| expr1 ADD expr1                    { { loc = get_loc (); expr = BinaryOp ($1, `Add, $3) } }
-| expr1 SUB expr1                    { { loc = get_loc (); expr = BinaryOp ($1, `Sub, $3) } }
-| expr1 MUL expr1                    { { loc = get_loc (); expr = BinaryOp ($1, `Mul, $3) } }
-| expr1 DIV expr1                    { { loc = get_loc (); expr = BinaryOp ($1, `Div, $3) } }
-| expr1 LT expr1                     { { loc = get_loc (); expr = BinaryOp ($1, `Lt, $3) } }
-| expr1 EQUAL expr1                  { { loc = get_loc (); expr = BinaryOp ($1, `Eq, $3) } }
-| expr1 ANDOP expr1                  { { loc = get_loc (); expr = BinaryOp ($1, `And, $3) } }
-| expr1 OROP expr1                   { { loc = get_loc (); expr = BinaryOp ($1, `Or, $3) } }
+| SUB expr1 %prec UNIT               { { loc = get_loc (); expr = UnaryOp (Neg, $2) } }
+| expr1 ADD expr1                    { { loc = get_loc (); expr = BinaryOp ($1, Add, $3) } }
+| expr1 SUB expr1                    { { loc = get_loc (); expr = BinaryOp ($1, Sub, $3) } }
+| expr1 MUL expr1                    { { loc = get_loc (); expr = BinaryOp ($1, Mul, $3) } }
+| expr1 DIV expr1                    { { loc = get_loc (); expr = BinaryOp ($1, Div, $3) } }
+| expr1 LT expr1                     { { loc = get_loc (); expr = BinaryOp ($1, Lt, $3) } }
+| expr1 EQUAL expr1                  { { loc = get_loc (); expr = BinaryOp ($1, Eq, $3) } }
+| expr1 ANDOP expr1                  { { loc = get_loc (); expr = BinaryOp ($1, And, $3) } }
+| expr1 OROP expr1                   { { loc = get_loc (); expr = BinaryOp ($1, Or, $3) } }
 | expr1 ASSIGN expr1                 { { loc = get_loc (); expr = Assign ($1, $3) } }
 | expr1 simple_expr                  { { loc = get_loc (); expr = App ($1, $2) } }
 

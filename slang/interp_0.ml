@@ -105,11 +105,11 @@ let rec interpret (env : env) (e : Ast.t) (store : store) : value * store =
             "runtime error : expecting an address on left side of assignment")
   | UnaryOp (op, e) ->
       let v, store' = interpret env e store in
-      (Unary_op.to_fun op v, store')
+      (Ast.Unary_op.to_fun op v, store')
   | BinaryOp (e1, op, e2) ->
       let v1, store1 = interpret env e1 store in
       let v2, store2 = interpret env e2 store1 in
-      (Binary_op.to_fun op (v1, v2), store2)
+      (Ast.Binary_op.to_fun op (v1, v2), store2)
   | If (e1, e2, e3) -> (
       let v, store' = interpret env e1 store in
       match v with

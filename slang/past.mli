@@ -6,8 +6,19 @@ module Loc : sig
   val pp : Format.formatter -> t -> unit
 end
 
-type unary_op = [ `Neg | `Not ]
-type binary_op = [ `Add | `And | `Div | `Eq | `Lt | `Mul | `Or | `Sub ]
+module Unary_op : sig
+  type t = Neg | Not
+
+  val to_string : t -> var
+  val pp : Format.formatter -> t -> unit
+end
+
+module Binary_op : sig
+  type t = Add | Sub | Mul | Div | Lt | And | Or | Eq
+
+  val to_string : t -> var
+  val pp : Format.formatter -> t -> unit
+end
 
 type t = { loc : Lexing.position; expr : expr }
 
@@ -17,8 +28,8 @@ and expr =
   | Var of var
   | Integer of int
   | Boolean of bool
-  | UnaryOp of unary_op * t
-  | BinaryOp of t * binary_op * t
+  | UnaryOp of Unary_op.t * t
+  | BinaryOp of t * Binary_op.t * t
   | If of t * t * t
   | Pair of t * t
   | Fst of t

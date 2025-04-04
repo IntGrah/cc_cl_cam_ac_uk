@@ -35,8 +35,8 @@ type value =
 and instruction =
   | PUSH of value
   | LOOKUP of Ast.var
-  | UNARY of Ast.unary_op
-  | OPER of Ast.binary_op
+  | UNARY of Ast.Unary_op.t
+  | OPER of Ast.Binary_op.t
   | ASSIGN
   | SWAP
   | POP
@@ -128,8 +128,8 @@ and pp_location fmt = function
   | l, Some i -> pr fmt "%s = %d" l i
 
 and pp_instruction fmt = function
-  | UNARY op -> pr fmt "  UNARY %a" Unary_op.pp op
-  | OPER op -> pr fmt "  OPER %a" Binary_op.pp op
+  | UNARY op -> pr fmt "  UNARY %a" Ast.Unary_op.pp op
+  | OPER op -> pr fmt "  OPER %a" Ast.Binary_op.pp op
   | MK_PAIR -> pr fmt "  MK_PAIR"
   | FST -> pr fmt "  FST"
   | SND -> pr fmt "  SND"
@@ -209,9 +209,9 @@ let step (cp, evs) =
   | SWAP, s1 :: s2 :: evs -> (cp + 1, s2 :: s1 :: evs)
   | BIND x, V v :: evs -> (cp + 1, EV [ (x, v) ] :: evs)
   | LOOKUP x, evs -> (cp + 1, V (search (evs, x)) :: evs)
-  | UNARY op, V v :: evs -> (cp + 1, V (Unary_op.to_fun op v) :: evs)
+  | UNARY op, V v :: evs -> (cp + 1, V (Ast.Unary_op.to_fun op v) :: evs)
   | OPER op, V v2 :: V v1 :: evs ->
-      (cp + 1, V (Binary_op.to_fun op (v1, v2)) :: evs)
+      (cp + 1, V (Ast.Binary_op.to_fun op (v1, v2)) :: evs)
   | MK_PAIR, V v2 :: V v1 :: evs -> (cp + 1, V (`Pair (v1, v2)) :: evs)
   | FST, V (`Pair (v, _)) :: evs -> (cp + 1, V v :: evs)
   | SND, V (`Pair (_, v)) :: evs -> (cp + 1, V v :: evs)

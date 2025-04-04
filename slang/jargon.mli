@@ -37,8 +37,8 @@ type value_path = STACK_LOCATION of offset | HEAP_LOCATION of offset
 type instruction =
   | PUSH of stack_item (* modified *)
   | LOOKUP of value_path (* modified *)
-  | UNARY of Ast.unary_op
-  | OPER of Ast.binary_op
+  | UNARY of Ast.Unary_op.t
+  | OPER of Ast.Binary_op.t
   | ASSIGN
   | SWAP
   | POP

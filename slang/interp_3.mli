@@ -7,8 +7,8 @@ type value
 and instruction =
   | PUSH of value
   | LOOKUP of Ast.var
-  | UNARY of Ast.unary_op
-  | OPER of Ast.binary_op
+  | UNARY of Ast.Unary_op.t
+  | OPER of Ast.Binary_op.t
   | ASSIGN
   | SWAP
   | POP

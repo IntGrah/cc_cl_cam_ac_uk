@@ -178,8 +178,8 @@ let steps exp =
   (string_list_of_code vm, driver 1 vm)
 
 let string_list_of_instruction : instruction -> string = function
-  | UNARY op -> "\tUNARY " ^ Unary_op.to_string op
-  | OPER op -> "\tOPER " ^ Binary_op.to_string op
+  | UNARY op -> "\tUNARY " ^ Ast.Unary_op.to_string op
+  | OPER op -> "\tOPER " ^ Ast.Binary_op.to_string op
   | MK_PAIR -> "\tMK_PAIR"
   | FST -> "\tFST"
   | SND -> "\tSND"

@@ -42,8 +42,8 @@ and closure = code * env
 and instruction =
   | PUSH of value
   | LOOKUP of var
-  | UNARY of Ast.unary_op
-  | OPER of Ast.binary_op
+  | UNARY of Ast.Unary_op.t
+  | OPER of Ast.Binary_op.t
   | ASSIGN
   | SWAP
   | POP
@@ -102,8 +102,8 @@ and pp_env fmt env = pp_list fmt ",@\n " pp_binding env
 and pp_binding fmt (x, v) = pr fmt "(%s, %a)" x pp_value v
 
 and pp_instruction fmt = function
-  | UNARY op -> pr fmt "@[UNARY %s@]" (Unary_op.to_string op)
-  | OPER op -> pr fmt "@[OPER %s@]" (Binary_op.to_string op)
+  | UNARY op -> pr fmt "@[UNARY %s@]" (Ast.Unary_op.to_string op)
+  | OPER op -> pr fmt "@[OPER %s@]" (Ast.Binary_op.to_string op)
   | MK_PAIR -> pr fmt "MK_PAIR"
   | FST -> pr fmt "FST"
   | SND -> pr fmt "SND"
@@ -215,9 +215,9 @@ let step = function
   | SWAP :: ds, e1 :: e2 :: evs, s -> (ds, e2 :: e1 :: evs, s)
   | BIND x :: ds, V v :: evs, s -> (ds, EV [ (x, v) ] :: evs, s)
   | LOOKUP x :: ds, evs, s -> (ds, V (search (evs, x)) :: evs, s)
-  | UNARY op :: ds, V v :: evs, s -> (ds, V (Unary_op.to_fun op v) :: evs, s)
+  | UNARY op :: ds, V v :: evs, s -> (ds, V (Ast.Unary_op.to_fun op v) :: evs, s)
   | OPER op :: ds, V v2 :: V v1 :: evs, s ->
-      (ds, V (Binary_op.to_fun op (v1, v2)) :: evs, s)
+      (ds, V (Ast.Binary_op.to_fun op (v1, v2)) :: evs, s)
   | MK_PAIR :: ds, V v2 :: V v1 :: evs, s -> (ds, V (`Pair (v1, v2)) :: evs, s)
   | FST :: ds, V (`Pair (v, _)) :: evs, s -> (ds, V v :: evs, s)
   | SND :: ds, V (`Pair (_, v)) :: evs, s -> (ds, V v :: evs, s)

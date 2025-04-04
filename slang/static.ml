@@ -13,7 +13,7 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
   in
   match e.expr with
   | Unit -> (Unit, `Unit)
-  | What -> (UnaryOp (`Read, Unit), `Int)
+  | What -> (UnaryOp (Read, Unit), `Int)
   | Integer i -> (Integer i, `Int)
   | Boolean b -> (Boolean b, `Bool)
   | Var x -> (
@@ -48,8 +48,8 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
         if t <> a then expected e.loc (a :> Type.hole) t else b
       in
       match op with
-      | `Neg -> (UnaryOp (`Neg, e'), exactly `Int `Int)
-      | `Not -> (UnaryOp (`Not, e'), exactly `Bool `Bool))
+      | Neg -> (UnaryOp (Neg, e'), exactly `Int `Int)
+      | Not -> (UnaryOp (Not, e'), exactly `Bool `Bool))
   | BinaryOp (e1, op, e2) -> (
       let e1', t1 = elab env e1 in
       let e2', t2 = elab env e2 in
@@ -59,19 +59,19 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
         else c
       in
       match op with
-      | `Add -> (BinaryOp (e1', `Add, e2'), exactly `Int `Int `Int)
-      | `Sub -> (BinaryOp (e1', `Sub, e2'), exactly `Int `Int `Int)
-      | `Mul -> (BinaryOp (e1', `Mul, e2'), exactly `Int `Int `Int)
-      | `Div -> (BinaryOp (e1', `Div, e2'), exactly `Int `Int `Int)
-      | `Lt -> (BinaryOp (e1', `Lt, e2'), exactly `Int `Int `Bool)
-      | `And -> (BinaryOp (e1', `And, e2'), exactly `Bool `Bool `Bool)
-      | `Or -> (BinaryOp (e1', `Or, e2'), exactly `Bool `Bool `Bool)
-      | `Eq ->
+      | Add -> (BinaryOp (e1', Add, e2'), exactly `Int `Int `Int)
+      | Sub -> (BinaryOp (e1', Sub, e2'), exactly `Int `Int `Int)
+      | Mul -> (BinaryOp (e1', Mul, e2'), exactly `Int `Int `Int)
+      | Div -> (BinaryOp (e1', Div, e2'), exactly `Int `Int `Int)
+      | Lt -> (BinaryOp (e1', Lt, e2'), exactly `Int `Int `Bool)
+      | And -> (BinaryOp (e1', And, e2'), exactly `Bool `Bool `Bool)
+      | Or -> (BinaryOp (e1', Or, e2'), exactly `Bool `Bool `Bool)
+      | Eq ->
           (* Monomorphise the equality operator *)
-          let op' : Ast.binary_op =
+          let op' : Ast.Binary_op.t =
             match t1 with
-            | `Int -> if t2 <> `Int then expected e2.loc `Int t2 else `Eqi
-            | `Bool -> if t2 <> `Bool then expected e2.loc `Bool t2 else `Eqb
+            | `Int -> if t2 <> `Int then expected e2.loc `Int t2 else Eqi
+            | `Bool -> if t2 <> `Bool then expected e2.loc `Bool t2 else Eqb
             | _ -> expected e1.loc (`Variable "int_or_bool") t1
           in
           (BinaryOp (e1', op', e2'), `Bool))

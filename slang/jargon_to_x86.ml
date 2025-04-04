@@ -61,10 +61,10 @@ let emit_x86 e =
     output_string out_chan ("\t" ^ c ^ tab_string ^ "# " ^ comment ^ "\n")
   in
   let label l = output_string out_chan (l ^ ":\n") in
-  let unary : Ast.unary_op -> unit = function
-    | `Not -> complain "NOT: not yet implemented in x86"
-    | `Neg -> complain "NEG: not yet implemented in x86"
-    | `Read ->
+  let unary : Ast.Unary_op.t -> unit = function
+    | Not -> complain "NOT: not yet implemented in x86"
+    | Neg -> complain "NEG: not yet implemented in x86"
+    | Read ->
         cmd "popq %rdi" "BEGIN read, put arg in %rdi";
         cmd "movq $0,%rax" "signal no floating point args";
         cmd "pushq %r11" "%r11 is caller-saved ";
@@ -87,10 +87,10 @@ let emit_x86 e =
     cmd "pushq $0" "END EQ, push false \n";
     label l2
   in
-  let binary : Ast.binary_op -> unit = function
-    | `And -> complain "AND: not yet implemented in x86"
-    | `Or -> complain "OR: not yet implemented in x86"
-    | `Lt ->
+  let binary : Ast.Binary_op.t -> unit = function
+    | And -> complain "AND: not yet implemented in x86"
+    | Or -> complain "OR: not yet implemented in x86"
+    | Lt ->
         let l1 = new_label () in
         (* label for not < *)
         let l2 = new_label () in
@@ -104,20 +104,20 @@ let emit_x86 e =
         label l1;
         cmd "pushq $0" "END EQI, push false \n";
         label l2
-    | `Eqb -> eq ()
-    | `Eqi -> eq ()
-    | `Add ->
+    | Eqb -> eq ()
+    | Eqi -> eq ()
+    | Add ->
         cmd "popq %rax" "BEGIN add, pop top-of-stack to %rax";
         cmd "addq %rax,(%rsp)" "END add, add %rax to top-of-stack \n"
-    | `Sub ->
+    | Sub ->
         cmd "popq %rax" "BEGIN sub, pop top-of-stack to %rax";
         cmd "subq %rax,(%rsp)" "END sub, subtract %rax from top-of-stack \n"
-    | `Mul ->
+    | Mul ->
         cmd "popq %rax" "BEGIN mul, pop arg 1 to %rax";
         cmd "popq %r10" "pop arg 2 to %r10";
         cmd "imulq %r10" "multiply %r10 by %rax, result in %rax";
         cmd "pushq %rax" "END mul, push result \n"
-    | `Div ->
+    | Div ->
         cmd "popq %r10" "BEGIN div, , pop top-of-stack to %r10";
         cmd "popq %rax" "pop divisor into %rax";
         cmd "cqto" "prepare for div (read x86 docs!)";

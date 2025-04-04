@@ -28,9 +28,9 @@ type value =
 and closure = Ast.var * Ast.t * env
 
 and continuation_action =
-  | UNARY of Ast.unary_op
-  | OPER of Ast.binary_op * value
-  | OPER_FST of Ast.t * env * Ast.binary_op
+  | UNARY of Ast.Unary_op.t
+  | OPER of Ast.Binary_op.t * value
+  | OPER_FST of Ast.t * env * Ast.Binary_op.t
   | ASSIGN of value
   | ASSIGN_FST of Ast.t * env
   | TAIL of Ast.t list * env
@@ -129,7 +129,7 @@ and string_of_binding (x, v) = "(" ^ x ^ ", " ^ string_of_value v ^ ")"
 let string_of_expr_list = string_of_list "; " Ast.to_string
 
 let string_of_continuation_action = function
-  | UNARY op -> "UNARY " ^ Unary_op.to_string op
+  | UNARY op -> "UNARY " ^ Ast.Unary_op.to_string op
   | MKPAIR v -> "MKPAIR " ^ string_of_value v
   | FST -> "FST"
   | SND -> "SND"
@@ -138,7 +138,7 @@ let string_of_continuation_action = function
   | APPLY v -> "APPLY " ^ string_of_value v
   | ARG (e, env) -> "ARG(" ^ Ast.to_string e ^ ", " ^ string_of_env env ^ ")"
   | OPER (op, v) ->
-      "OPER(" ^ Binary_op.to_string op ^ ", " ^ string_of_value v ^ ")"
+      "OPER(" ^ Ast.Binary_op.to_string op ^ ", " ^ string_of_value v ^ ")"
   | CASE (x1, e1, x2, e2, env) ->
       "CASE(" ^ x1 ^ ", " ^ Ast.to_string e1 ^ ", " ^ x2 ^ ", "
       ^ Ast.to_string e2 ^ ", " ^ string_of_env env ^ ")"
@@ -146,7 +146,7 @@ let string_of_continuation_action = function
       "PAIR_FST(" ^ Ast.to_string e ^ ", " ^ string_of_env env ^ ")"
   | OPER_FST (e, env, op) ->
       "OPER_FST(" ^ Ast.to_string e ^ ", " ^ string_of_env env ^ ", "
-      ^ Binary_op.to_string op ^ ")"
+      ^ Ast.Binary_op.to_string op ^ ")"
   | IF (e1, e2, env) ->
       "IF(" ^ Ast.to_string e1 ^ ", " ^ Ast.to_string e2 ^ ", "
       ^ string_of_env env ^ ")"
@@ -218,8 +218,8 @@ let step = function
   | INSPECT (Boolean b, _, k) -> COMPUTE (k, `Bool b)
   | INSPECT (Lambda (x, body), env, k) -> COMPUTE (k, mk_fun (x, body, env))
   (* COMPUTE --> COMPUTE *)
-  | COMPUTE (UNARY op :: k, v) -> COMPUTE (k, Unary_op.to_fun op v)
-  | COMPUTE (OPER (op, v1) :: k, v2) -> COMPUTE (k, Binary_op.to_fun op (v1, v2))
+  | COMPUTE (UNARY op :: k, v) -> COMPUTE (k, Ast.Unary_op.to_fun op v)
+  | COMPUTE (OPER (op, v1) :: k, v2) -> COMPUTE (k, Ast.Binary_op.to_fun op (v1, v2))
   | COMPUTE (MKPAIR v1 :: k, v2) -> COMPUTE (k, `Pair (v1, v2))
   | COMPUTE (FST :: k, `Pair (v, _)) -> COMPUTE (k, v)
   | COMPUTE (SND :: k, `Pair (_, v)) -> COMPUTE (k, v)

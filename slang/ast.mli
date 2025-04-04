@@ -1,14 +1,36 @@
 type var = string
-type unary_op = [ `Neg | `Not | `Read ]
-type binary_op = [ `Add | `And | `Div | `Eqb | `Eqi | `Lt | `Mul | `Or | `Sub ]
+
+module Unary_op : sig
+  type t = Neg | Not | Read
+
+  val to_fun :
+    t ->
+    [> `Bool of bool | `Int of int | `Unit ] ->
+    [> `Bool of bool | `Int of int ]
+
+  val to_string : t -> var
+  val pp : Format.formatter -> t -> unit
+end
+
+module Binary_op : sig
+  type t = Add | Sub | Mul | Div | Lt | And | Or | Eqi | Eqb
+
+  val to_fun :
+    t ->
+    [> `Bool of bool | `Int of int ] * [> `Bool of bool | `Int of int ] ->
+    [> `Bool of bool | `Int of int ]
+
+  val to_string : t -> var
+  val pp : Format.formatter -> t -> unit
+end
 
 type t =
   | Unit
   | Var of var
   | Integer of int
   | Boolean of bool
-  | UnaryOp of unary_op * t
-  | BinaryOp of t * binary_op * t
+  | UnaryOp of Unary_op.t * t
+  | BinaryOp of t * Binary_op.t * t
   | If of t * t * t
   | Pair of t * t
   | Fst of t

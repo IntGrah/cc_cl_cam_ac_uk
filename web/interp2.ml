@@ -38,8 +38,8 @@ let rec string_list_of_code c =
   | s :: t -> ("[" ^ s) :: apply_to_last (fun s -> s ^ "]") t
 
 and string_list_of_instruction : instruction -> string list = function
-  | UNARY op -> [ "UNARY " ^ Unary_op.to_string op ]
-  | OPER op -> [ "OPER " ^ Binary_op.to_string op ]
+  | UNARY op -> [ "UNARY " ^ Ast.Unary_op.to_string op ]
+  | OPER op -> [ "OPER " ^ Ast.Binary_op.to_string op ]
   | MK_PAIR -> [ "MK_PAIR" ]
   | FST -> [ "FST" ]
   | SND -> [ "SND" ]

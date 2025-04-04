@@ -8,8 +8,39 @@ module Loc = struct
       (loc.pos_cnum - loc.pos_bol + 1)
 end
 
-type unary_op = [ `Neg | `Not ]
-type binary_op = [ `Add | `Sub | `Mul | `Div | `Lt | `And | `Or | `Eq ]
+module Unary_op = struct
+  type t = Neg | Not
+
+  let to_string = function Neg -> "Neg" | Not -> "Not"
+
+  let pp ppf = function
+    | Neg -> Format.fprintf ppf "-"
+    | Not -> Format.fprintf ppf "~"
+end
+
+module Binary_op = struct
+  type t = Add | Sub | Mul | Div | Lt | And | Or | Eq
+
+  let to_string = function
+    | Add -> "Add"
+    | Sub -> "Sub"
+    | Mul -> "Mul"
+    | Div -> "Div"
+    | Lt -> "Lt"
+    | And -> "And"
+    | Or -> "Or"
+    | Eq -> "Eq"
+
+  let pp ppf = function
+    | Add -> Format.fprintf ppf "+"
+    | Sub -> Format.fprintf ppf "-"
+    | Mul -> Format.fprintf ppf "*"
+    | Div -> Format.fprintf ppf "/"
+    | Lt -> Format.fprintf ppf "<"
+    | And -> Format.fprintf ppf "&&"
+    | Or -> Format.fprintf ppf "||"
+    | Eq -> Format.fprintf ppf "="
+end
 
 type t = { loc : Loc.t; expr : expr }
 
@@ -19,8 +50,8 @@ and expr =
   | Var of var
   | Integer of int
   | Boolean of bool
-  | UnaryOp of unary_op * t
-  | BinaryOp of t * binary_op * t
+  | UnaryOp of Unary_op.t * t
+  | BinaryOp of t * Binary_op.t * t
   | If of t * t * t
   | Pair of t * t
   | Fst of t
