@@ -70,12 +70,6 @@ let new_address () =
   next_address := a + 1;
   a
 
-let do_assign a = function v, store -> (`Unit, update (store, (a, v)))
-
-(*
-    interpret : (expr * env * store) -> (value * store)
-              : (expr * (var -> value) * address -> value) -> value
-*)
 let rec interpret (env : env) (e : Ast.t) (store : store) : value * store =
   match e with
   | Unit -> (`Unit, store)
@@ -88,10 +82,10 @@ let rec interpret (env : env) (e : Ast.t) (store : store) : value * store =
       let _, store = interpret env e store in
       interpret env (Seq rest) store
   | While (e1, e2) -> (
-      let v, store' = interpret env e1 store in
+      let v, store = interpret env e1 store in
       match v with
-      | `Bool true -> interpret env (Seq [ e2; e ]) store'
-      | `Bool false -> (`Unit, store')
+      | `Bool true -> interpret env (Seq [ e2; e ]) store
+      | `Bool false -> (`Unit, store)
       | _ -> Errors.complain "runtime error.  Expecting a boolean!")
   | Ref e ->
       let v, store = interpret env e store in
@@ -104,54 +98,56 @@ let rec interpret (env : env) (e : Ast.t) (store : store) : value * store =
       | _ -> Errors.complain "runtime error.  Expecting an address!")
   | Assign (e1, e2) -> (
       match interpret env e1 store with
-      | `Ref a, store -> do_assign a (interpret env e2 store)
+      | `Ref a, store ->
+          let v, store = interpret env e2 store in
+          (`Unit, update (store, (a, v)))
       | _ ->
           Errors.complain
             "runtime error : expecting an address on left side of assignment")
   | UnaryOp (op, e) ->
-      let v, store' = interpret env e store in
-      (Ast.Unary_op.to_fun op v, store')
+      let v, store = interpret env e store in
+      (Ast.Unary_op.to_fun op v, store)
   | BinaryOp (e1, op, e2) ->
-      let v1, store1 = interpret env e1 store in
-      let v2, store2 = interpret env e2 store1 in
-      (Ast.Binary_op.to_fun op (v1, v2), store2)
+      let v1, store = interpret env e1 store in
+      let v2, store = interpret env e2 store in
+      (Ast.Binary_op.to_fun op (v1, v2), store)
   | If (e1, e2, e3) -> (
-      let v, store' = interpret env e1 store in
+      let v, store = interpret env e1 store in
       match v with
-      | `Bool true -> interpret env e2 store'
-      | `Bool false -> interpret env e3 store'
+      | `Bool true -> interpret env e2 store
+      | `Bool false -> interpret env e3 store
       | _ -> Errors.complain "runtime error.  Expecting a boolean!")
   | Pair (e1, e2) ->
-      let v1, store1 = interpret env e1 store in
-      let v2, store2 = interpret env e2 store1 in
-      (`Pair (v1, v2), store2)
+      let v1, store = interpret env e1 store in
+      let v2, store = interpret env e2 store in
+      (`Pair (v1, v2), store)
   | Fst e -> (
       match interpret env e store with
-      | `Pair (v1, _), store' -> (v1, store')
+      | `Pair (v1, _), store -> (v1, store)
       | _ -> Errors.complain "runtime error.  Expecting a pair!")
   | Snd e -> (
       match interpret env e store with
-      | `Pair (_, v2), store' -> (v2, store')
+      | `Pair (_, v2), store -> (v2, store)
       | _ -> Errors.complain "runtime error.  Expecting a pair!")
   | Inl e ->
-      let v, store' = interpret env e store in
-      (`Inl v, store')
+      let v, store = interpret env e store in
+      (`Inl v, store)
   | Inr e ->
-      let v, store' = interpret env e store in
-      (`Inr v, store')
+      let v, store = interpret env e store in
+      (`Inr v, store)
   | Case (e, (x1, e1), (x2, e2)) -> (
-      let v, store' = interpret env e store in
+      let v, store = interpret env e store in
       match v with
-      | `Inl v' -> interpret (update (env, (x1, v'))) e1 store'
-      | `Inr v' -> interpret (update (env, (x2, v'))) e2 store'
+      | `Inl v' -> interpret (update (env, (x1, v'))) e1 store
+      | `Inr v' -> interpret (update (env, (x2, v'))) e2 store
       | _ -> Errors.complain "runtime error.  Expecting inl or inr!")
   | Lambda (x, e) ->
       (`Fun (fun v s -> interpret (update (env, (x, v))) e s), store)
   | App (e1, e2) -> (
-      let v2, store1 = interpret env e2 store in
-      let v1, store2 = interpret env e1 store1 in
+      let v2, store = interpret env e2 store in
+      let v1, store = interpret env e1 store in
       match v1 with
-      | `Fun f -> f v2 store2
+      | `Fun f -> f v2 store
       | _ -> Errors.complain "runtime error.  Expecting a function!")
   | LetFun (f, (x, body), e) ->
       let new_env =
