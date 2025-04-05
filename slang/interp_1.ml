@@ -56,13 +56,9 @@ type state =
   | INSPECT of Ast.t * env * continuation
   | COMPUTE of continuation * value
 
-(* update : (env * binding) -> env *)
-let update (env, (x, v)) = (x, v) :: env
+let update (x, v) env = (x, v) :: env
 
-(* When making a closure, only include bindings that
-   are needed.
-*)
-
+(** When making a closure, only include bindings that are needed. *)
 let filter_env fvars = List.filter (fun (x, _) -> List.mem x fvars)
 
 let mk_fun (x, body, env) =
@@ -76,11 +72,8 @@ let mk_rec_fun (f, x, body, env) =
   let f_binding = (f, `Rec_closure (x, body, [])) in
   `Closure (x, body, f_binding :: smaller_env)
 
-(*
-      for a recursive function f we want
-
-      lookup (env, f) = FUN(true, (x, body, env))
-*)
+(** for a recursive function [f] we want
+    [lookup (env, f) = FUN(true, (x, body, env))] *)
 let lookup (env, x) =
   let rec aux = function
     | [] -> Errors.complain (x ^ " is not defined!\n")
@@ -190,9 +183,9 @@ let step = function
       INSPECT (e, env, CASE (x1, e1, x2, e2, env) :: k)
   | INSPECT (App (e1, e2), env, k) -> INSPECT (e2, env, ARG (e1, env) :: k)
   | INSPECT (LetFun (f, (x, body), e), env, k) ->
-      INSPECT (e, update (env, (f, mk_fun (x, body, env))), k)
+      INSPECT (e, update (f, mk_fun (x, body, env)) env, k)
   | INSPECT (LetRecFun (f, (x, body), e), env, k) ->
-      INSPECT (e, update (env, (f, mk_rec_fun (f, x, body, env))), k)
+      INSPECT (e, update (f, mk_rec_fun (f, x, body, env)) env, k)
   | INSPECT (Ref e, env, k) -> INSPECT (e, env, MKREF :: k)
   | INSPECT (Deref e, env, k) -> INSPECT (e, env, DEREF :: k)
   | INSPECT (Assign (e1, e2), env, k) ->
@@ -226,15 +219,15 @@ let step = function
   | COMPUTE (OPER_FST (e2, env, op) :: k, v1) ->
       INSPECT (e2, env, OPER (op, v1) :: k)
   | COMPUTE (APPLY v2 :: k, `Closure (x, body, env)) ->
-      INSPECT (body, update (env, (x, v2)), k)
+      INSPECT (body, update (x, v2) env, k)
   | COMPUTE (APPLY v2 :: k, `Rec_closure (x, body, env)) ->
-      INSPECT (body, update (env, (x, v2)), k)
+      INSPECT (body, update (x, v2) env, k)
   | COMPUTE (ARG (e2, env) :: k, v) -> INSPECT (e2, env, APPLY v :: k)
   | COMPUTE (PAIR_FST (e2, env) :: k, v1) -> INSPECT (e2, env, MKPAIR v1 :: k)
   | COMPUTE (CASE (x1, e1, _, _, env) :: k, `Inl v) ->
-      INSPECT (e1, update (env, (x1, v)), k)
+      INSPECT (e1, update (x1, v) env, k)
   | COMPUTE (CASE (_, _, x2, e2, env) :: k, `Inr v) ->
-      INSPECT (e2, update (env, (x2, v)), k)
+      INSPECT (e2, update (x2, v) env, k)
   | COMPUTE (IF (e2, _, env) :: k, `Bool true) -> INSPECT (e2, env, k)
   | COMPUTE (IF (_, e3, env) :: k, `Bool false) -> INSPECT (e3, env, k)
   | COMPUTE (ASSIGN_FST (e2, env) :: k, v) -> INSPECT (e2, env, ASSIGN v :: k)

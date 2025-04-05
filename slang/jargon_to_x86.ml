@@ -45,7 +45,7 @@ let emit_x86 e =
   let tab c =
     output_string out_chan ("\t" ^ c ^ "\n")
     (* It would be nice to print source locations next to each line.
-		   Exercise: pass the location data while maintaining a semblence
+		   Exercise: pass the location data while maintaining a semblance
 			 of polymorphism.
 			
 			 *cough* typeclasses *cough*
