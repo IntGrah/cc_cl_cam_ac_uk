@@ -63,13 +63,7 @@ let update (env, (x, v)) = (x, v) :: env
    are needed.
 *)
 
-let rec filter_env fvars = function
-  | [] -> []
-  | (x, v) :: rest ->
-      if List.mem x fvars then
-        (x, v) :: filter_env fvars rest
-      else
-        filter_env fvars rest
+let filter_env fvars = List.filter (fun (x, _) -> List.mem x fvars)
 
 let mk_fun (x, body, env) =
   let fvars = Free_vars.free_vars [ x ] body in
