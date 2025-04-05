@@ -67,7 +67,7 @@ let new_address =
     next_address := a + 1;
     a
 
-let rec interp (env : env) (e : Ast.t) (store : store) : value * store =
+let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
   (* State monad would be more concise *)
   match e with
   | Unit -> (`Unit, store)
@@ -75,95 +75,95 @@ let rec interp (env : env) (e : Ast.t) (store : store) : value * store =
   | Integer n -> (`Int n, store)
   | Boolean b -> (`Bool b, store)
   | Seq [] -> (`Unit, store) (* should not be seen ... *)
-  | Seq [ e ] -> interp env e store
+  | Seq [ e ] -> interp e env store
   | Seq (e :: rest) ->
-      let _, store = interp env e store in
-      interp env (Seq rest) store
+      let _, store = interp e env store in
+      interp (Seq rest) env store
   | While (e1, e2) -> (
-      let v, store = interp env e1 store in
+      let v, store = interp e1 env store in
       match v with
-      | `Bool true -> interp env (Seq [ e2; e ]) store
+      | `Bool true -> interp (Seq [ e2; e ]) env store
       | `Bool false -> (`Unit, store)
       | _ -> Errors.complain "Runtime error: expecting a boolean!")
   | Ref e ->
-      let v, store = interp env e store in
+      let v, store = interp e env store in
       let a = new_address () in
       (`Ref a, update (a, v) store)
   | Deref e -> (
-      let v, store = interp env e store in
+      let v, store = interp e env store in
       match v with
       | `Ref a -> (store a, store)
       | _ -> Errors.complain "Runtime error: expecting an address!")
   | Assign (e1, e2) -> (
-      match interp env e1 store with
+      match interp e1 env store with
       | `Ref a, store ->
-          let v, store = interp env e2 store in
+          let v, store = interp e2 env store in
           (`Unit, update (a, v) store)
       | _ ->
           Errors.complain
             "Runtime error: expecting an address on left side of assignment")
   | UnaryOp (op, e) ->
-      let v, store = interp env e store in
+      let v, store = interp e env store in
       (Ast.Unary_op.to_fun op v, store)
   | BinaryOp (e1, op, e2) ->
-      let v1, store = interp env e1 store in
-      let v2, store = interp env e2 store in
+      let v1, store = interp e1 env store in
+      let v2, store = interp e2 env store in
       (Ast.Binary_op.to_fun op (v1, v2), store)
   | If (e1, e2, e3) -> (
-      let v, store = interp env e1 store in
+      let v, store = interp e1 env store in
       match v with
-      | `Bool true -> interp env e2 store
-      | `Bool false -> interp env e3 store
+      | `Bool true -> interp e2 env store
+      | `Bool false -> interp e3 env store
       | _ -> Errors.complain "Runtime error: expecting a boolean")
   | Pair (e1, e2) ->
-      let v1, store = interp env e1 store in
-      let v2, store = interp env e2 store in
+      let v1, store = interp e1 env store in
+      let v2, store = interp e2 env store in
       (`Pair (v1, v2), store)
   | Fst e -> (
-      match interp env e store with
+      match interp e env store with
       | `Pair (v1, _), store -> (v1, store)
       | _ -> Errors.complain "Runtime error: expecting a pair")
   | Snd e -> (
-      match interp env e store with
+      match interp e env store with
       | `Pair (_, v2), store -> (v2, store)
       | _ -> Errors.complain "Runtime error: expecting a pair")
   | Inl e ->
-      let v, store = interp env e store in
+      let v, store = interp e env store in
       (`Inl v, store)
   | Inr e ->
-      let v, store = interp env e store in
+      let v, store = interp e env store in
       (`Inr v, store)
   | Case (e, (x1, e1), (x2, e2)) -> (
-      let v, store = interp env e store in
+      let v, store = interp e env store in
       match v with
-      | `Inl v' -> interp (update (x1, v') env) e1 store
-      | `Inr v' -> interp (update (x2, v') env) e2 store
+      | `Inl v' -> interp e1 (update (x1, v') env) store
+      | `Inr v' -> interp e2 (update (x2, v') env) store
       | _ -> Errors.complain "Runtime error: expecting inl or inr")
-  | Lambda (x, e) -> (`Fun (fun v s -> interp (update (x, v) env) e s), store)
+  | Lambda (x, e) -> (`Fun (fun v -> interp e (update (x, v) env)), store)
   | App (e1, e2) -> (
-      let v2, store = interp env e2 store in
-      let v1, store = interp env e1 store in
+      let v2, store = interp e2 env store in
+      let v1, store = interp e1 env store in
       match v1 with
       | `Fun f -> f v2 store
       | _ -> Errors.complain "Runtime error: expecting a function")
   | LetFun (f, (x, body), e) ->
       let new_env =
-        update (f, `Fun (fun v -> interp (update (x, v) env) body)) env
+        update (f, `Fun (fun v -> interp body (update (x, v) env))) env
       in
-      interp new_env e store
+      interp e new_env store
   | LetRecFun (f, (x, body), e) ->
       let rec new_env g =
         (* A recursive environment! *)
         if g = f then
-          `Fun (fun v -> interp (update (x, v) new_env) body)
+          `Fun (fun v -> interp body (update (x, v) new_env))
         else
           env g
       in
-      interp new_env e store
+      interp e new_env store
 
 let empty_env : env = fun x -> Errors.complainf "%s is not defined" x
 let empty_store : store = fun x -> Errors.complainf "%d is not allocated" x
 
 let interpret (e : Ast.t) : value =
-  let v, _ = interp empty_env e empty_store in
+  let v, _ = interp e empty_env empty_store in
   v
