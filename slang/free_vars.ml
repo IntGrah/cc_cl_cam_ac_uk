@@ -1,8 +1,6 @@
-(* free_vars bound e returns a
-    list, with no duplicates, of all free variables
-    of e that are not in the list bvars.
-*)
-let free_vars (bound : Ast.var list) (exp : Ast.t) =
+(** [free_vars bound e] returns a list, with no duplicates, of all free
+    variables of [e] that are not in the list [bound]. *)
+let free_vars (bound : Ast.var list) (exp : Ast.t) : Ast.var list =
   let rec aux (bound : Ast.var list) (free : Ast.var list) :
       Ast.t -> Ast.var list = function
     | Var x ->

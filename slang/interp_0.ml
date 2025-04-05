@@ -40,7 +40,7 @@ and store = address -> value
 
 type env = Ast.var -> value
 
-(* auxiliary functions *)
+(* Auxiliary functions *)
 
 let rec string_of_value : value -> string = function
   | `Ref a -> Format.sprintf "address(%d)" a
