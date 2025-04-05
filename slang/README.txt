@@ -3,7 +3,7 @@ Computer Laboratory
 University of Cambridge
 Timothy G. Griffin (tgg22@cam.ac.uk)
 
-This directory contains Ocaml code implementing
+This directory contains OCaml code implementing
 high-level interpreters for the language
 Slang ( = Simple LANGuage), a fragment of the
 language L3 from 1B Semantics.

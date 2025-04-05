@@ -6,7 +6,7 @@ University of Cambridge
 Timothy G. Griffin (tgg22@cam.ac.uk)
 *****************************************
 
-This directory contains Ocaml examples illustrating
+This directory contains OCaml examples illustrating
 some basic transformations.
 
 tail.ml : Illustrates the introduction of tail recursion

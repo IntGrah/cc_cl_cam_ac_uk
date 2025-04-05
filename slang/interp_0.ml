@@ -8,14 +8,14 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
 (** Interpreter 0 for Slang.2
 
     This is a "definitional" interpreter for for Slang.2 (the defined language)
-    using high-level constructs of Ocaml (the defining language). For examples,
-    Slang.2 functions are represented as Ocaml functions of type
+    using high-level constructs of OCaml (the defining language). For examples,
+    Slang.2 functions are represented as OCaml functions of type
 
     value -> value
 
-    Slang conditionals are translated to Ocaml conditionals, etc. The most
+    Slang conditionals are translated to OCaml conditionals, etc. The most
     interesting (and tricky) case is the "let rec" construct of Slang --- this
-    is translated using the "lec rec" construct of Ocaml. Not with the defined
+    is translated using the "lec rec" construct of OCaml. Not with the defined
     function itself, but with the definition of a recursive environment!
     (Because when a recursive function calls itself, it must find its own
     definition in the environment...)

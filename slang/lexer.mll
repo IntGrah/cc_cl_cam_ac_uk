@@ -2,7 +2,7 @@
   open Parser
   open Lexing
 
-(* next_line copied from  Ch. 16 of "Real World Ocaml" *)
+(* next_line copied from  Ch. 16 of "Real World OCaml" *)
 let next_line lexbuf =
   let pos = lexbuf.lex_curr_p in
   lexbuf.lex_curr_p <-

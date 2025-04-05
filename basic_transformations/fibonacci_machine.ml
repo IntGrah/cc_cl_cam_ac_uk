@@ -15,11 +15,11 @@
    4) rewrite code using lists (stacks really)
 
    The result in Fibonacci Machine computes using iteration,
-   step-by-step, and so Ocaml should compile this into code
-   that is iterative (not using Ocaml's runtime stack).
+   step-by-step, and so OCaml should compile this into code
+   that is iterative (not using OCaml's runtime stack).
    However, the Fibonacci Machine carries its own stack!
 
-   The easiest way to use this file is to enter the Ocaml read-eval print loop
+   The easiest way to use this file is to enter the OCaml read-eval print loop
    and type
        #use "fibonacci_machine.ml";;
 
@@ -183,7 +183,7 @@ let print_state n (t, m, cnt) =
 let verbose = ref true
 
 (*
-   The Ocaml compiler probably compiles this recursive function
+   The OCaml compiler probably compiles this recursive function
    into iteration (no stack).  Of course we have build "the stack"
    into our machine ;-)
 

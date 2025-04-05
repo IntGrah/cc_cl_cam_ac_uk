@@ -2,7 +2,7 @@
 
 [![Main workflow](https://github.com/yallop/cc_cl_cam_ac_uk/actions/workflows/test.yml/badge.svg)](https://github.com/yallop/cc_cl_cam_ac_uk/actions/workflows/test.yml)
 
-## Ocaml dependencies
+## OCaml dependencies
 
 After installing opam, run:
 
