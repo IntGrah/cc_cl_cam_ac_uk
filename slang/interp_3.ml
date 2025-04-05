@@ -17,8 +17,6 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
 
     --- compiler elimnates WHILE construct *)
 
-open Errors
-
 type address = int
 type label = string
 type location = label * address option
@@ -89,7 +87,7 @@ let rec lookup (env, x) =
 
 let rec search (evs, x) =
   match evs with
-  | [] -> complainf "%s is not defined!@\n" x
+  | [] -> Errors.complainf "%s is not defined!@\n" x
   | V _ :: rest -> search (rest, x)
   | RA _ :: rest -> search (rest, x)
   | EV env :: rest -> (
@@ -248,7 +246,7 @@ let step (cp, evs) =
   | LABEL _, evs -> (cp + 1, evs)
   | HALT, evs -> (cp, evs)
   | GOTO (_, Some i), evs -> (i, evs)
-  | _ -> complainf "step : bad state = %a\n" pp_state (cp, evs)
+  | _ -> Errors.complainf "step : bad state = %a\n" pp_state (cp, evs)
 
 (* COMPILE *)
 
@@ -408,13 +406,14 @@ let rec driver n ((cp, evs) as state) =
     Format.printf "\nstate %d:%a\n" n pp_state state;
   match (get_instruction cp, evs) with
   | HALT, [ V v ] -> v
-  | HALT, _ -> complainf "driver : bad halted state = %a\n" pp_state state
+  | HALT, _ ->
+      Errors.complainf "driver : bad halted state = %a\n" pp_state state
   | _ -> driver (n + 1) (step state)
 
 (* put code listing into an array, associate an array index to each label *)
 let load l =
   let rec find lab = function
-    | [] -> complainf "find : %s is not found" lab
+    | [] -> Errors.complainf "find : %s is not found" lab
     | (x, v) :: rest ->
         if x = lab then
           v
