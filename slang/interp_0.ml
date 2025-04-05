@@ -44,8 +44,8 @@ type env = Ast.var -> value
 
 let rec string_of_value : value -> string = function
   | `Ref a -> Format.sprintf "address(%d)" a
-  | `Bool b -> Printf.sprintf "%b" b
-  | `Int n -> Printf.sprintf "%d" n
+  | `Bool b -> Format.sprintf "%b" b
+  | `Int n -> Format.sprintf "%d" n
   | `Unit -> "()"
   | `Pair (v1, v2) ->
       Format.sprintf "(%s, %s)" (string_of_value v1) (string_of_value v2)
