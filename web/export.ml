@@ -22,7 +22,7 @@ let _ =
            (wrap
               (fun x ->
                 Interp_0.string_of_value
-                  (Interp_0.interpret_top_level (frontend x)))
+                  (Interp_0.interpret (frontend x)))
               str)
 
        method interp2 str =

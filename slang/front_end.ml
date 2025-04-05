@@ -25,10 +25,10 @@ let init_lexbuf file =
     with _ -> error file "initialize lexer" ("can't open file " ^ file)
   in
   let lexbuf = Lexing.from_channel in_chan in
-  let _ =
-    lexbuf.lex_curr_p <-
-      { pos_fname = file; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 }
-  in
+
+  lexbuf.lex_curr_p <-
+    { pos_fname = file; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 };
+
   (file, lexbuf)
 
 (* parse input file *)
@@ -37,7 +37,7 @@ let parse (file, lexbuf) =
     try Parser.start Lexer.token lexbuf
     with Parsing.Parse_error -> parse_error file lexbuf
   in
-  let _ = print_if_verbose "Parsed result" e Past.to_string in
+  print_if_verbose "Parsed result" e Past.to_string;
   (file, e)
 
 (* perform static checks *)
@@ -47,7 +47,7 @@ let check (file, e) =
     | Errors.Error s -> error file "static check" s
     | Static.Type_error _ -> error file "type check" "type error"
   in
-  let _ = print_if_verbose "After static checks" e' Ast.to_string in
+  print_if_verbose "After static checks" e' Ast.to_string;
   e'
 
 (* translate from Past.expr to Ast.expr *)
@@ -57,11 +57,9 @@ let front_end file = check (parse (init_lexbuf file))
 
 let front_end_from_string str =
   let initstrbuf str =
-    let lexbuf = from_string str in
-    let _ =
-      lexbuf.lex_curr_p <-
-        { pos_fname = "input"; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 }
-    in
+    let lexbuf = Lexing.from_string str in
+    lexbuf.lex_curr_p <-
+      { pos_fname = "input"; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 };
     ("input", lexbuf)
   in
   check (parse (initstrbuf str))
