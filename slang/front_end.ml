@@ -1,5 +1,5 @@
-let error file action s =
-  Errors.complain ("\nERROR in " ^ file ^ " with " ^ action ^ " : " ^ s ^ "\n")
+let error filename action s =
+  Errors.complain ("\nERROR in " ^ filename ^ " with " ^ action ^ " : " ^ s ^ "\n")
 
 let print_if_verbose m pp e =
   if Option.verbose_front then (
@@ -10,11 +10,11 @@ let print_if_verbose m pp e =
        else
          pp e))
 
-let parse_error file (lexbuf : Lexing.lexbuf) =
+let parse_error filename (lexbuf : Lexing.lexbuf) =
   let pos = lexbuf.lex_curr_p in
   let line = string_of_int pos.pos_lnum in
   let pos = string_of_int (pos.pos_cnum - pos.pos_bol + 1) in
-  error file "parsing" ("at line " ^ line ^ " position " ^ pos)
+  error filename "parsing" ("at line " ^ line ^ " position " ^ pos)
 
 (* Parse input file *)
 let parse file lexbuf =
@@ -26,10 +26,10 @@ let parse file lexbuf =
   e
 
 (* Perform static checks and translate from Past to Ast *)
-let check file e =
+let check filename e =
   let e' =
     try Static.translate e
-    with Type.Type_error _ -> error file "type check" "type error"
+    with Type.Type_error _ -> error filename "type check" "type error"
   in
   print_if_verbose "After static checks:" Ast.to_string e';
   e'
