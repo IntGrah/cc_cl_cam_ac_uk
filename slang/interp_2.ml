@@ -4,16 +4,21 @@ Computer Laboratory
 University of Cambridge
 Timothy G. Griffin (tgg22@cam.ac.uk)
 *****************************************)
-(* Interpreter 2.
 
-A high-level stack-oriented abstract machine with compiler.
-What do I mean by "high-level"?
----Code is still tree-structured.
----Complex values are pushed onto value stack.
----Slang state (heap) used only for references.
----Code is maintained on a code stack.
----Program variables contained in code.
-*)
+(** Interpreter 2.
+
+    A high-level stack-oriented abstract machine with compiler. What do I mean
+    by "high-level"?
+
+    --- Code is still tree-structured.
+
+    --- Complex values are pushed onto value stack.
+
+    --- Slang state (heap) used only for references.
+
+    --- Code is maintained on a code stack.
+
+    --- Program variables contained in code. *)
 
 module IntMap = Map.Make (Int)
 
@@ -145,9 +150,7 @@ let string_of_code = Format.asprintf "%a" pp_code
 
 (* The "MACHINE" *)
 
-(* allocate a new location in the heap
-   and give it value v
-*)
+(** allocate a new location in the heap and give it value v *)
 let allocate (heap, i) v =
   if i < Option.heap_max then
     let heap = IntMap.add i v heap in
@@ -160,9 +163,6 @@ let deref (heap, _) a = IntMap.find a heap
 let assign (heap, i) a v =
   let heap = IntMap.add a v heap in
   (heap, i)
-
-(* update : (env * binding) -> env *)
-(* let update(env, (x, v)) = (x, v) :: env *)
 
 let mk_fun (c, env) = `Closure (c, env)
 let mk_rec (f, c, env) = `Closure (c, (f, `Rec_closure c) :: env)
@@ -200,11 +200,9 @@ let rec evs_to_env = function
   | V _ :: rest -> evs_to_env rest
   | EV env :: rest -> env @ evs_to_env rest
 
-(*
-    val step : interp_state -> interp_state
-             = (code * env_value_stack * state) -> (code * env_value_stack * state)
-*)
-let step = function
+(** val step : interp_state -> interp_state = (code * env_value_stack * state)
+    -> (code * env_value_stack * state) *)
+let step : interp_state -> interp_state = function
   (* (code stack, value/env stack, state) -> (code stack, value/env stack, state) *)
   | PUSH v :: ds, evs, s -> (ds, V v :: evs, s)
   | POP :: ds, _ :: evs, s -> (ds, evs, s)

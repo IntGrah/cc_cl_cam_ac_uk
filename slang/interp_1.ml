@@ -4,13 +4,11 @@ Computer Laboratory
 University of Cambridge
 Timothy G. Griffin (tgg22@cam.ac.uk)
 *****************************************)
-(* Interpreter 1.
 
-   Derived from Interpreter 1 via
-   CPS and DFC transformations applied
-   to the code of Interp_0.interpret.
+(** Interpreter 1.
 
-*)
+    Derived from Interpreter 1 via CPS and DFC transformations applied to the
+    code of Interp_0.interpret. *)
 
 type address = int
 

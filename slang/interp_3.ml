@@ -4,16 +4,18 @@ Computer Laboratory
 University of Cambridge
 Timothy G. Griffin (tgg22@cam.ac.uk)
 *****************************************)
-(*
-   Interpreter 3.
 
-   Derived from Interpreter 2 by
-   --- Make instructions linear by introducing
-       labels and jumps.
-   --- labels translated to numeric addresses.
-   --- include "code pointer" in state
-   --- compiler elimnates WHILE construct
-*)
+(** Interpreter 3.
+
+    Derived from Interpreter 2 by
+
+    --- Make instructions linear by introducing labels and jumps.
+
+    --- labels translated to numeric addresses.
+
+    --- include "code pointer" in state
+
+    --- compiler elimnates WHILE construct *)
 
 open Errors
 
@@ -440,8 +442,7 @@ let load l =
   let l_map = listing_to_label_map l in
   Array.of_list (List.map (apply_label_map_to_instruction l_map) l)
 
-(* interpret : expr -> value *)
-let interpret e =
+let interpret (e : Ast.t) : value =
   let c = compile e in
   installed := load c;
   if Option.verbose then
