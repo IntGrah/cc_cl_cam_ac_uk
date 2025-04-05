@@ -111,6 +111,6 @@ texpr:
 | UNITTYPE                           { `Unit  }
 | texpr ARROW texpr                  { `Arrow ($1, $3)}
 | texpr MUL texpr                    { `Product ($1, $3)}
-| texpr ADD texpr                    { `Union ($1, $3)}
+| texpr ADD texpr                    { `Sum ($1, $3)}
 | texpr REF                          { `Ref $1 }
 | LPAREN texpr RPAREN                { $2 }

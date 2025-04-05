@@ -4,20 +4,10 @@ type t =
   | `Int
   | `Product of t * t
   | `Ref of t
-  | `Union of t * t
+  | `Sum of t * t
   | `Unit ]
 
-type hole =
-  [ `Arrow of hole * hole
-  | `Bool
-  | `Int
-  | `Product of hole * hole
-  | `Ref of hole
-  | `Union of hole * hole
-  | `Unit
-  | `Variable of string ]
-
-exception Type_error of { loc : Lexing.position; expecting : hole; found : t }
+exception Type_error of { loc : Lexing.position; message : string }
 
 val to_string :
   ([< `Arrow of 'a * 'a
@@ -25,9 +15,11 @@ val to_string :
    | `Int
    | `Product of 'a * 'a
    | `Ref of 'a
-   | `Union of 'a * 'a
+   | `Sum of 'a * 'a
    | `Unit
-   | `Variable of string ]
+   | `a
+   | `b
+   | `Var of string ]
    as
    'a) ->
   string
@@ -39,9 +31,11 @@ val pp :
    | `Int
    | `Product of 'a * 'a
    | `Ref of 'a
-   | `Union of 'a * 'a
+   | `Sum of 'a * 'a
    | `Unit
-   | `Variable of string ]
+   | `a
+   | `b
+   | `Var of string ]
    as
    'a) ->
   unit

@@ -1,15 +1,27 @@
-let expected loc expecting found =
-  raise (Type.Type_error { loc; expecting; found })
+let expected (e : Past.t) expecting found =
+  raise
+    (Type.Type_error
+       {
+         loc = e.loc;
+         message =
+           Format.asprintf
+             "Expected an expression of type\n\
+             \  %a\n\
+              but got type\n\
+             \  %a\n\
+             \ instead."
+             Type.pp expecting Type.pp found;
+       })
 
 type env = (Ast.var * Type.t) list
 
 let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
-  let elab_as env (e : Past.t) (expecting : Type.t) =
+  let elab_as env (e : Past.t) expecting =
     let elab, found = elab env e in
     if found = expecting then
       elab
     else
-      expected e.loc (expecting :> Type.hole) found
+      expected e expecting found
   in
   match e.expr with
   | Unit -> (Unit, `Unit)
@@ -33,12 +45,12 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
   | Deref e -> (
       match elab env e with
       | e', `Ref t -> (Deref e', t)
-      | _, t -> expected e.loc (`Ref (`Variable "a")) t)
+      | _, t -> expected e (`Ref `a) t)
   | Assign (e1, e2) ->
       let e1', t =
         match elab env e1 with
         | e1', `Ref t -> (e1', t)
-        | _, t -> expected e1.loc (`Ref (`Variable "a")) t
+        | _, t -> expected e1 (`Ref `a) t
       in
       let e2' = elab_as env e2 t in
       (Assign (e1', e2'), `Unit)
@@ -46,7 +58,7 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
       let e', t = elab env e in
       let exactly (a : Type.t) (b : Type.t) =
         if t <> a then
-          expected e.loc (a :> Type.hole) t
+          expected e a t
         else
           b
       in
@@ -58,9 +70,9 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
       let e2', t2 = elab env e2 in
       let exactly a b c =
         if t1 <> a then
-          expected e1.loc (a :> Type.hole) t1
+          expected e1 a t1
         else if t2 <> b then
-          expected e2.loc (b :> Type.hole) t2
+          expected e2 b t2
         else
           c
       in
@@ -78,15 +90,15 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
             match t1 with
             | `Int ->
                 if t2 <> `Int then
-                  expected e2.loc `Int t2
+                  expected e2 `Int t2
                 else
                   Eqi
             | `Bool ->
                 if t2 <> `Bool then
-                  expected e2.loc `Bool t2
+                  expected e2 `Bool t2
                 else
                   Eqb
-            | _ -> expected e1.loc (`Variable "int_or_bool") t1
+            | _ -> expected e1 (`Var "'int or 'bool") t1
           in
           (BinaryOp (e1', op', e2'), `Bool))
   | If (pe1, pe2, pe3) ->
@@ -101,19 +113,19 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
   | Fst e -> (
       match elab env e with
       | e', `Product (t, _) -> (Fst e', t)
-      | _, t -> expected e.loc (`Product (`Variable "a", `Variable "b")) t)
+      | _, t -> expected e (`Product (`a, `b)) t)
   | Snd e -> (
       match elab env e with
       | e', `Product (_, t) -> (Snd e', t)
-      | _, t -> expected e.loc (`Product (`Variable "a", `Variable "b")) t)
+      | _, t -> expected e (`Product (`a, `b)) t)
   | Inl (b, e) ->
       let e', a = elab env e in
-      (Inl e', `Union (a, b))
+      (Inl e', `Sum (a, b))
   | Inr (a, e) ->
       let e', b = elab env e in
-      (Inr e', `Union (a, b))
+      (Inr e', `Sum (a, b))
   | Case (e, (x, s, e1), (y, t, e2)) ->
-      let e' = elab_as env e (`Union (s, t)) in
+      let e' = elab_as env e (`Sum (s, t)) in
       let e1' = elab_as ((x, s) :: env) e1 s in
       let e2' = elab_as ((y, t) :: env) e2 t in
       (Case (e', (x, e1'), (y, e2')), `Unit)
@@ -125,7 +137,7 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
       | e1', `Arrow (a, b) ->
           let e2' = elab_as env e2 a in
           (App (e1', e2'), b)
-      | _, t2 -> expected e1.loc (`Arrow (`Variable "a", `Variable "b")) t2)
+      | _, t2 -> expected e1 (`Arrow (`a, `b)) t2)
   | Let (x, t, pe1, pe2) ->
       let ie1 = elab_as env pe1 t in
       let ie2, t2 = elab ((x, t) :: env) pe2 in
