@@ -174,12 +174,13 @@ let string_of_state = function
       "COMPUTE(" ^ string_of_continuation cnt ^ ", " ^ string_of_value v ^ ")"
 
 let heap = Array.make Option.heap_max (`Int 0)
-let next_address = ref 0
 
-let new_address () =
-  let a = !next_address in
-  next_address := a + 1;
-  a
+let new_address =
+  let next_address = ref 0 in
+  fun () ->
+    let a = !next_address in
+    next_address := a + 1;
+    a
 
 let mk_ref v =
   let a = new_address () in

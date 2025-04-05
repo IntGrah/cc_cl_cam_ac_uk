@@ -53,9 +53,6 @@ let rec string_of_value : value -> string = function
   | `Inr v -> Format.sprintf "inr(%s)" (string_of_value v)
   | `Fun _ -> "function( ... )"
 
-(* update : (env * binding) -> env
-   update : (store * (address * value)) -> store
-*)
 let update (x, v) env =
  fun y ->
   if x = y then
@@ -63,12 +60,12 @@ let update (x, v) env =
   else
     env y
 
-let next_address = ref 0
-
-let new_address () =
-  let a = !next_address in
-  next_address := a + 1;
-  a
+let new_address =
+  let next_address = ref 0 in
+  fun () ->
+    let a = !next_address in
+    next_address := a + 1;
+    a
 
 let rec interpret (env : env) (e : Ast.t) (store : store) : value * store =
   match e with
