@@ -1,6 +1,5 @@
 (*
-     free_vars (bvars, e) returns a list of the
+     free_vars bvars e returns a list of the
      free vars of e that are not contained in bvars.
-
 *)
 val free_vars : Ast.var list -> Ast.t -> Ast.var list

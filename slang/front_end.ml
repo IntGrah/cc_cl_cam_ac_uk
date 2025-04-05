@@ -3,14 +3,13 @@ let error file action s =
 
 let print_if_verbose m e pp =
   if Option.verbose_front then
-    print_string
+    print_endline
       (m ^ ":\n"
-      ^ (if Option.verbose_tree then
-           Pptree.pp_no_bracket
-         else
-           fun x -> x)
-          (pp e)
-      ^ "\n")
+      ^
+      if Option.verbose_tree then
+        Pptree.pp_no_bracket (pp e)
+      else
+        pp e)
 
 let parse_error file (lexbuf : Lexing.lexbuf) =
   let pos = lexbuf.lex_curr_p in
@@ -18,7 +17,7 @@ let parse_error file (lexbuf : Lexing.lexbuf) =
   let pos = string_of_int (pos.pos_cnum - pos.pos_bol + 1) in
   error file "parsing" ("at line " ^ line ^ " position " ^ pos)
 
-(* initialize lexer *)
+(* Initialize lexer *)
 let init_lexbuf file =
   let in_chan =
     try open_in file
@@ -31,7 +30,7 @@ let init_lexbuf file =
 
   (file, lexbuf)
 
-(* parse input file *)
+(* Parse input file *)
 let parse (file, lexbuf) =
   let e =
     try Parser.start Lexer.token lexbuf
@@ -40,7 +39,7 @@ let parse (file, lexbuf) =
   print_if_verbose "Parsed result" e Past.to_string;
   (file, e)
 
-(* perform static checks *)
+(* Perform static checks and translate from Past to Ast *)
 let check (file, e) =
   let e', _ =
     try Static.elab [] e with
@@ -50,9 +49,7 @@ let check (file, e) =
   print_if_verbose "After static checks" e' Ast.to_string;
   e'
 
-(* translate from Past.expr to Ast.expr *)
-
-(* the front end *)
+(* The front end *)
 let front_end file = check (parse (init_lexbuf file))
 
 let front_end_from_string str =
