@@ -63,12 +63,10 @@ let update (env, (x, v)) = (x, v) :: env
    are needed.
 *)
 
-let rec inlist x = function [] -> false | y :: rest -> x = y || inlist x rest
-
 let rec filter_env fvars = function
   | [] -> []
   | (x, v) :: rest ->
-      if inlist x fvars then
+      if List.mem x fvars then
         (x, v) :: filter_env fvars rest
       else
         filter_env fvars rest
