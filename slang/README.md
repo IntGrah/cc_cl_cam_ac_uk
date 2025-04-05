@@ -10,7 +10,7 @@ language L3 from 1B Semantics.
 
 ## Building
 
-See [top level README.md](/README.md) for build instructions.
+See [top level README](/README.md) for build instructions.
 
 ## Usage
 
