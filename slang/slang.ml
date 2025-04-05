@@ -30,7 +30,7 @@ let wrap file e interpret msg =
 
 let i0 (file, e) =
   wrap file e
-    (fun x -> Interp_0.string_of_value (Interp_0.interpret_top_level x))
+    (fun x -> Interp_0.string_of_value (Interp_0.interpret x))
     "Interpreter 0"
 
 let i1 (file, e) =
