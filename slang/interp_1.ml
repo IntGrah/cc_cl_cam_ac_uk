@@ -244,6 +244,6 @@ let rec driver n state =
       ("\nstate " ^ string_of_int n ^ " = \n" ^ string_of_state state ^ "\n");
   match state with COMPUTE ([], v) -> v | _ -> driver (n + 1) (step state)
 
-let eval (e, env) = driver 1 (INSPECT (e, env, []))
+let eval e env = driver 1 (INSPECT (e, env, []))
 let env_empty : env = []
-let interpret (e : Ast.t) : value = eval (e, env_empty)
+let interpret (e : Ast.t) : value = eval e env_empty
