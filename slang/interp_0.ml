@@ -5,26 +5,25 @@ University of Cambridge
 Timothy G. Griffin (tgg22@cam.ac.uk)
 *****************************************)
 
-(*  Interpreter 0 for Slang.2
+(** Interpreter 0 for Slang.2
 
-    This is a "definitional" interpreter for  for Slang.2 (the defined language)
-    using high-level constructs of Ocaml (the defining language).
-    For examples, Slang.2 functions are represented as Ocaml functions
-    of type
+    This is a "definitional" interpreter for for Slang.2 (the defined language)
+    using high-level constructs of Ocaml (the defining language). For examples,
+    Slang.2 functions are represented as Ocaml functions of type
 
-           value -> value
+    value -> value
 
-    Slang conditionals are translated to Ocaml conditionals, etc.
-    The most interesting (and tricky) case is the "let rec" construct of
-    Slang --- this is translated using the "lec rec" construct of Ocaml.
-    Not with the defined function itself, but with the definition of
-    a recursive environment! (Because when a recursive function
-    calls itself, it must find its own definition in the environment...)
+    Slang conditionals are translated to Ocaml conditionals, etc. The most
+    interesting (and tricky) case is the "let rec" construct of Slang --- this
+    is translated using the "lec rec" construct of Ocaml. Not with the defined
+    function itself, but with the definition of a recursive environment!
+    (Because when a recursive function calls itself, it must find its own
+    definition in the environment...)
 
-    Note that some of the functions can fail.  However,
-    if the input expressin has passed static analysis, then such "run time"
-    errors should never happen! (Can you prove that?)
-*)
+    Note that some of the functions can fail. However, if the input expression
+    has passed static analysis, then such "run time" errors should never happen!
+    (Can you prove that?) *)
+
 type address = int
 
 type value =

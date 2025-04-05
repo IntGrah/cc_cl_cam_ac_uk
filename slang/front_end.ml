@@ -1,5 +1,3 @@
-open Lexing
-
 let error file action s =
   Errors.complain ("\nERROR in " ^ file ^ " with " ^ action ^ " : " ^ s ^ "\n")
 
@@ -14,7 +12,7 @@ let print_if_verbose m e pp =
           (pp e)
       ^ "\n")
 
-let parse_error file lexbuf =
+let parse_error file (lexbuf : Lexing.lexbuf) =
   let pos = lexbuf.lex_curr_p in
   let line = string_of_int pos.pos_lnum in
   let pos = string_of_int (pos.pos_cnum - pos.pos_bol + 1) in
@@ -26,7 +24,7 @@ let init_lexbuf file =
     try open_in file
     with _ -> error file "initialize lexer" ("can't open file " ^ file)
   in
-  let lexbuf = from_channel in_chan in
+  let lexbuf = Lexing.from_channel in_chan in
   let _ =
     lexbuf.lex_curr_p <-
       { pos_fname = file; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 }
@@ -57,13 +55,13 @@ let check (file, e) =
 (* the front end *)
 let front_end file = check (parse (init_lexbuf file))
 
-(* front end reading directly from string *)
-let initstrbuf str =
-  let lexbuf = from_string str in
-  let _ =
-    lexbuf.lex_curr_p <-
-      { pos_fname = "input"; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 }
+let front_end_from_string str =
+  let initstrbuf str =
+    let lexbuf = from_string str in
+    let _ =
+      lexbuf.lex_curr_p <-
+        { pos_fname = "input"; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 }
+    in
+    ("input", lexbuf)
   in
-  ("input", lexbuf)
-
-let front_end_from_string str = check (parse (initstrbuf str))
+  check (parse (initstrbuf str))
