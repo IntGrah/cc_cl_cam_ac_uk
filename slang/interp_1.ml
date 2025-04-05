@@ -103,13 +103,7 @@ let lookup (env, x) =
   in
   aux env
 
-let string_of_list sep f l =
-  let rec aux f = function
-    | [] -> ""
-    | [ t ] -> f t
-    | t :: rest -> f t ^ sep ^ aux f rest
-  in
-  "[" ^ aux f l ^ "]"
+let string_of_list sep f l = "[" ^ String.concat sep (List.map f l) ^ "]"
 
 let rec string_of_value : value -> string = function
   | `Ref a -> "REF(" ^ string_of_int a ^ ")"
