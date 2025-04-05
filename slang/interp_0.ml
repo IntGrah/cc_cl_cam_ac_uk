@@ -56,7 +56,7 @@ let rec string_of_value : value -> string = function
 (* update : (env * binding) -> env
    update : (store * (address * value)) -> store
 *)
-let update (env, (x, v)) =
+let update (x, v) env =
  fun y ->
   if x = y then
     v
@@ -90,7 +90,7 @@ let rec interpret (env : env) (e : Ast.t) (store : store) : value * store =
   | Ref e ->
       let v, store = interpret env e store in
       let a = new_address () in
-      (`Ref a, update (store, (a, v)))
+      (`Ref a, update (a, v) store)
   | Deref e -> (
       let v, store = interpret env e store in
       match v with
@@ -100,7 +100,7 @@ let rec interpret (env : env) (e : Ast.t) (store : store) : value * store =
       match interpret env e1 store with
       | `Ref a, store ->
           let v, store = interpret env e2 store in
-          (`Unit, update (store, (a, v)))
+          (`Unit, update (a, v) store)
       | _ ->
           Errors.complain
             "runtime error : expecting an address on left side of assignment")
@@ -138,11 +138,10 @@ let rec interpret (env : env) (e : Ast.t) (store : store) : value * store =
   | Case (e, (x1, e1), (x2, e2)) -> (
       let v, store = interpret env e store in
       match v with
-      | `Inl v' -> interpret (update (env, (x1, v'))) e1 store
-      | `Inr v' -> interpret (update (env, (x2, v'))) e2 store
+      | `Inl v' -> interpret (update (x1, v') env) e1 store
+      | `Inr v' -> interpret (update (x2, v') env) e2 store
       | _ -> Errors.complain "runtime error.  Expecting inl or inr!")
-  | Lambda (x, e) ->
-      (`Fun (fun v s -> interpret (update (env, (x, v))) e s), store)
+  | Lambda (x, e) -> (`Fun (fun v s -> interpret (update (x, v) env) e s), store)
   | App (e1, e2) -> (
       let v2, store = interpret env e2 store in
       let v1, store = interpret env e1 store in
@@ -151,28 +150,24 @@ let rec interpret (env : env) (e : Ast.t) (store : store) : value * store =
       | _ -> Errors.complain "runtime error.  Expecting a function!")
   | LetFun (f, (x, body), e) ->
       let new_env =
-        update
-          (env, (f, `Fun (fun v s -> interpret (update (env, (x, v))) body s)))
+        update (f, `Fun (fun v s -> interpret (update (x, v) env) body s)) env
       in
       interpret new_env e store
   | LetRecFun (f, (x, body), e) ->
       let rec new_env g =
         (* a recursive environment! *)
         if g = f then
-          `Fun (fun v s -> interpret (update (new_env, (x, v))) body s)
+          `Fun (fun v s -> interpret (update (x, v) new_env) body s)
         else
           env g
       in
       interpret new_env e store
 
-(* env_empty : env *)
-let empty_env = fun x -> Errors.complain (x ^ " is not defined!\n")
+let empty_env : env = fun x -> Errors.complain (x ^ " is not defined!\n")
 
-(* store_empty : env *)
-let empty_store =
+let empty_store : store =
  fun x -> Errors.complain (string_of_int x ^ " is not allocated!\n")
 
-(* interpret_top_level : expr -> value *)
-let interpret_top_level e =
+let interpret_top_level (e : Ast.t) : value =
   let v, _ = interpret empty_env e empty_store in
   v
