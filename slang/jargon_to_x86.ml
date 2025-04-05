@@ -35,7 +35,6 @@ A few comments on the code below:
 -- "giria" means "slang" in Portuguese.
 
  *****************************************)
-let complain = Errors.complain
 
 let emit_x86 e =
   (* strip ".slang" off of filename *)
@@ -67,8 +66,8 @@ let emit_x86 e =
   in
   let label l = output_string out_chan (l ^ ":\n") in
   let unary : Ast.Unary_op.t -> unit = function
-    | Not -> complain "NOT: not yet implemented in x86"
-    | Neg -> complain "NEG: not yet implemented in x86"
+    | Not -> Errors.complain "NOT: not yet implemented in x86"
+    | Neg -> Errors.complain "NEG: not yet implemented in x86"
     | Read ->
         cmd "popq %rdi" "BEGIN read, put arg in %rdi";
         cmd "movq $0,%rax" "signal no floating point args";
@@ -93,8 +92,8 @@ let emit_x86 e =
     label l2
   in
   let binary : Ast.Binary_op.t -> unit = function
-    | And -> complain "AND: not yet implemented in x86"
-    | Or -> complain "OR: not yet implemented in x86"
+    | And -> Errors.complain "AND: not yet implemented in x86"
+    | Or -> Errors.complain "OR: not yet implemented in x86"
     | Lt ->
         let l1 = new_label () in
         (* label for not < *)
@@ -297,15 +296,15 @@ let emit_x86 e =
     | PUSH (STACK_BOOL false) -> cmd "pushq $0" "push false \n"
     | PUSH STACK_UNIT -> cmd "pushq $0" "push false \n"
     | PUSH (STACK_HI _) ->
-        complain
+        Errors.complain
           "Internal Error : Jargon code never explicitly pushes stack pointer"
     | PUSH (STACK_RA _) ->
-        complain
+        Errors.complain
           "Internal Error : Jargon code never explicitly pushes return address"
     | PUSH (STACK_FP _) ->
-        complain
+        Errors.complain
           "Internal Error : Jargon code never explicitly pushes frame pointer"
-    | HALT -> complain "HALT found in Jargon code from Jargon.comp"
+    | HALT -> Errors.complain "HALT found in Jargon code from Jargon.comp"
   in
   let rec emitl = function
     | [] -> ()
@@ -317,7 +316,7 @@ let emit_x86 e =
     if 0 = Sys.command s then
       ()
     else
-      complain ("command failed: " ^ s)
+      Errors.complain ("command failed: " ^ s)
   in
   let defs, cl =
     comp [] e

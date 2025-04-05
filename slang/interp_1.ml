@@ -170,7 +170,7 @@ let new_address =
 
 let mk_ref v =
   let a = new_address () in
-  let _ = heap.(a) <- v in
+  heap.(a) <- v;
   `Ref a
 
 let do_assign a v = heap.(a) <- v
@@ -252,9 +252,5 @@ let rec driver n state =
   match state with COMPUTE ([], v) -> v | _ -> driver (n + 1) (step state)
 
 let eval (e, env) = driver 1 (INSPECT (e, env, []))
-
-(* env_empty : env *)
-let env_empty = []
-
-(* interpret : Ast.t -> value *)
-let interpret e = eval (e, env_empty)
+let env_empty : env = []
+let interpret (e : Ast.t) : value = eval (e, env_empty)

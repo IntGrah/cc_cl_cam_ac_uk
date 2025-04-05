@@ -205,7 +205,7 @@ let rec evs_to_env = function
              = (code * env_value_stack * state) -> (code * env_value_stack * state)
 *)
 let step = function
-  (* (code stack,         value/env stack, state) -> (code stack,  value/env stack, state) *)
+  (* (code stack, value/env stack, state) -> (code stack, value/env stack, state) *)
   | PUSH v :: ds, evs, s -> (ds, V v :: evs, s)
   | POP :: ds, _ :: evs, s -> (ds, evs, s)
   | SWAP :: ds, e1 :: e2 :: evs, s -> (ds, e2 :: e1 :: evs, s)
