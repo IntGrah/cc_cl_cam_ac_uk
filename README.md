@@ -18,7 +18,7 @@ To build the slang compiler:
 dune build
 ```
 
-See [the slang readme file](/slang/README.md) for instructions on how to run the compiler.
+See the [slang README file](/slang/README.md) for instructions on how to run the compiler.
 
 To clean the repo
 
