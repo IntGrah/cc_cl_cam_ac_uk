@@ -443,16 +443,13 @@ let load l =
 (* interpret : expr -> value *)
 let interpret e =
   let c = compile e in
-  let () = installed := load c in
-  let () =
-    if Option.verbose then
-      Format.printf "\nInstalled Code = \n%s" (string_of_installed_code ())
-  in
+  installed := load c;
+  if Option.verbose then
+    Format.printf "\nInstalled Code = \n%s" (string_of_installed_code ());
   (* set the code pointer to 0 *)
   driver 1 (0, [])
 
-let reset =
- fun () ->
+let reset () =
   next_address := 0;
   label_ref := 0;
   Array.fill heap 0 (Array.length heap) (`Int 0)

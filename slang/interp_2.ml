@@ -309,8 +309,6 @@ let initial_env = []
 (* interpret : expr -> (value * state) *)
 let interpret e =
   let c = compile e in
-  let () =
-    if Option.verbose then
-      Format.printf "Compile code =@\n%a@." pp_code c
-  in
+  if Option.verbose then
+    Format.printf "Compile code =@\n%a@." pp_code c;
   driver 1 (c, initial_env, initial_state)

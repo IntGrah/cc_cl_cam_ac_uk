@@ -246,11 +246,9 @@ let step = function
         ("step : malformed state = " ^ string_of_state state ^ "\n")
 
 let rec driver n state =
-  let _ =
-    if Option.verbose then
-      print_string
-        ("\nstate " ^ string_of_int n ^ " = \n" ^ string_of_state state ^ "\n")
-  in
+  if Option.verbose then
+    print_string
+      ("\nstate " ^ string_of_int n ^ " = \n" ^ string_of_state state ^ "\n");
   match state with COMPUTE ([], v) -> v | _ -> driver (n + 1) (step state)
 
 let eval (e, env) = driver 1 (INSPECT (e, env, []))
