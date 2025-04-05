@@ -1,4 +1,4 @@
-Compiler Construction 2020
+# Compiler Construction 2020
 Computer Laboratory
 University of Cambridge
 Timothy G. Griffin (tgg22@cam.ac.uk)
@@ -8,20 +8,19 @@ high-level interpreters for the language
 Slang ( = Simple LANGuage), a fragment of the
 language L3 from 1B Semantics.
 
-===============================================
-Building
-===============================================
-See top level readme for build instructions.
+## Building
 
-===============================================
-Usage
-===============================================
+See top level [README.md] for build instructions.
+
+## Usage
+
 You can run using the command:
-
+```
   dune exec ./slang.exe
-
+```
 See below for detailed usage documentation:
 
+```
 Usage: slang.exe [options] [<file>]
 Options are:
   -V verbose front end
@@ -38,14 +37,13 @@ Options are:
   -t run all test/*.slang with each selected interpreter, report unexpected outputs (silent otherwise)
   -help  Display this list of options
   --help  Display this list of options
+```
 
+## Files
 
-===============================================
-Files
-===============================================
+Every `.ml` file has an associated `.mli` file describing its interface.
 
-Every .ml file has an associated .mli file describing its interface.
-
+```
 errors.ml      : Error exception
 past.ml        : the Parsed AST, with pretty printing
 lexer.mll      : specification for ocamllex
@@ -78,7 +76,4 @@ jargon.ml      : Could be called "interp_4".
 interp_1.ml    : The "missing link" between interp_0
                  and interp_0.  Best understood in terms
                  of a CPS translation on interp_0 itself.
-
-
-
-
+```
