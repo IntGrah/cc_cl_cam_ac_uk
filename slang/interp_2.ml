@@ -15,13 +15,7 @@ What do I mean by "high-level"?
 ---Program variables contained in code.
 *)
 
-open Errors
-
-module IntMap = Map.Make (struct
-  type t = int
-
-  let compare = compare
-end)
+module IntMap = Map.Make (Int)
 
 type address = int
 type var = string
@@ -159,7 +153,7 @@ let allocate (heap, i) v =
     let heap = IntMap.add i v heap in
     (i, (heap, i + 1))
   else
-    complain "runtime error: heap kaput"
+    Errors.complain "runtime error: heap kaput"
 
 let deref (heap, _) a = IntMap.find a heap
 
@@ -196,7 +190,7 @@ let rec lookup_opt = function
 
 let rec search (evs, x) =
   match evs with
-  | [] -> complainf "%s is not defined!\n" x
+  | [] -> Errors.complainf "%s is not defined!\n" x
   | V _ :: rest -> search (rest, x)
   | EV env :: rest -> (
       match lookup_opt (env, x) with None -> search (rest, x) | Some v -> v)
@@ -243,7 +237,7 @@ let step = function
       (ds, V (mk_rec (f, c, evs_to_env evs)) :: evs, s)
   | APPLY :: ds, V (`Closure (c, env)) :: V v :: evs, s ->
       (c @ ds, V v :: EV env :: evs, s)
-  | state -> complainf "step : bad state = %a\n" pp_interp_state state
+  | state -> Errors.complainf "step : bad state = %a\n" pp_interp_state state
 
 let rec driver n state =
   let () =
