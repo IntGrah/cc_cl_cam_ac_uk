@@ -3,13 +3,15 @@ type var = string
 module Unary_op = struct
   type t = Neg | Not | Read
 
+  (** Works with any supertype of
+      [[> `Bool of bool | `Int of int | `Unit of unit ]]*)
   let to_fun = function
     | Neg -> ( function `Int i -> `Int (-i) | _ -> failwith "")
     | Not -> ( function `Bool i -> `Bool (not i) | _ -> failwith "")
     | Read -> (
         function
         | `Unit ->
-            print_string ">>>";
+            print_string ">>> ";
             `Int (read_int ())
         | _ -> failwith "")
 
@@ -24,6 +26,7 @@ end
 module Binary_op = struct
   type t = Add | Sub | Mul | Div | Lt | And | Or | Eqi | Eqb
 
+  (** Works with any supertype of [[> `Bool of bool | `Int of int  ]]*)
   let to_fun = function
     | Add -> ( function `Int m, `Int n -> `Int (m + n) | _ -> failwith "")
     | Sub -> ( function `Int m, `Int n -> `Int (m - n) | _ -> failwith "")

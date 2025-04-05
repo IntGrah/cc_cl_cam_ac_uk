@@ -17,6 +17,8 @@ type hole =
   | `Union of hole * hole
   | `Variable of string ]
 
+exception Type_error of { loc : Lexing.position; expecting : hole; found : t }
+
 let rec to_string = function
   | `Int -> Format.sprintf "Int"
   | `Bool -> Format.sprintf "Bool"

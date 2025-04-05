@@ -1,7 +1,5 @@
-exception
-  Type_error of { loc : Past.Loc.t; expecting : Type.hole; found : Type.t }
-
-let expected loc expecting found = raise (Type_error { loc; expecting; found })
+let expected loc expecting found =
+  raise (Type.Type_error { loc; expecting; found })
 
 type env = (Ast.var * Type.t) list
 
@@ -142,3 +140,7 @@ let rec elab (env : env) (e : Past.t) : Ast.t * Type.t =
     if z = f then None else Some x) env in let make = if List.mem f (fv
     bound_vars_except_f body) then make_letrecfun else make_letfun in make loc f
     x t1 t2 body' (elaborate env' e) *)
+
+let translate (e : Past.t) =
+  let e', _ = elab [] e in
+  e'

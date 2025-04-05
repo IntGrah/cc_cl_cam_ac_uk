@@ -41,10 +41,9 @@ let parse (file, lexbuf) =
 
 (* Perform static checks and translate from Past to Ast *)
 let check (file, e) =
-  let e', _ =
-    try Static.elab [] e with
-    | Errors.Error s -> error file "static check" s
-    | Static.Type_error _ -> error file "type check" "type error"
+  let e' =
+    try Static.translate e
+    with Type.Type_error _ -> error file "type check" "type error"
   in
   print_if_verbose "After static checks" e' Ast.to_string;
   e'

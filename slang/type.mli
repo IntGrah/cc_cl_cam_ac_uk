@@ -17,6 +17,8 @@ type hole =
   | `Unit
   | `Variable of string ]
 
+exception Type_error of { loc : Lexing.position; expecting : hole; found : t }
+
 val to_string :
   ([< `Arrow of 'a * 'a
    | `Bool
