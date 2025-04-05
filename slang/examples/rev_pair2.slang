@@ -1,4 +1,4 @@
 
-let rev (p : int * int) : int * int  = (snd p, fst p)
+let rev (p : int * int) : int * int = (snd p, fst p)
 in
      rev (?, ?)

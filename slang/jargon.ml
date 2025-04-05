@@ -18,9 +18,9 @@ type stack_item =
   | STACK_INT of int
   | STACK_BOOL of bool
   | STACK_UNIT
-  | STACK_HI of heap_index (* Pointer into Heap            *)
-  | STACK_RA of code_index (* return address               *)
-  | STACK_FP of stack_index (* Frame pointer                *)
+  | STACK_HI of heap_index (* Pointer into Heap *)
+  | STACK_RA of code_index (* return address *)
+  | STACK_FP of stack_index (* Frame pointer *)
 
 type heap_type = HT_PAIR | HT_INL | HT_INR | HT_CLOSURE
 
@@ -28,8 +28,8 @@ type heap_item =
   | HEAP_INT of int
   | HEAP_BOOL of bool
   | HEAP_UNIT
-  | HEAP_HI of heap_index (* Pointer into Heap            *)
-  | HEAP_CI of code_index (* Code pointer for closures    *)
+  | HEAP_HI of heap_index (* Pointer into Heap *)
+  | HEAP_CI of code_index (* Code pointer for closures *)
   | HEAP_HEADER of int * heap_type (* int is number of items to follow *)
 
 type value_path = STACK_LOCATION of offset | HEAP_LOCATION of offset
@@ -79,13 +79,6 @@ let get_instruction vm = Array.get vm.code vm.cp
 let stack_top vm = Array.get vm.stack (vm.sp - 1)
 
 (********************** Printing ********************************)
-
-(* let string_of_list sep f l =
-   let rec aux f = function
-     | [] -> ""
-     | [t] -> (f t)
-     | t :: rest -> (f t) ^  sep  ^ (aux f rest)
-   in "[" ^ (aux f l) ^ "]" *)
 
 let string_of_status = function
   | Halted -> "halted"
