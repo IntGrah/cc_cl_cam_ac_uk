@@ -35,7 +35,7 @@ let i0 (file, e) =
 
 let i1 (file, e) =
   wrap file e
-    (fun x -> Interp_1.string_of_value (Interp_1.interpret x))
+    (fun x -> Format.asprintf "%a" Interp_1.pp_value (Interp_1.interpret x))
     "Interpreter 1"
 
 let i2 (file, e) =

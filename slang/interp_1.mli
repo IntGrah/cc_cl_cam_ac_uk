@@ -1,4 +1,4 @@
 type value
 
-val string_of_value : value -> string
+val pp_value : Format.formatter -> value -> unit
 val interpret : Ast.t -> value

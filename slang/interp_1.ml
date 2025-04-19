@@ -10,19 +10,8 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
     Derived from Interpreter 1 via CPS and DFC transformations applied to the
     code of Interp_0.interpret. *)
 
-type address = int
-
-type value =
-  [ `Ref of address
-  | `Int of int
-  | `Bool of bool
-  | `Unit
-  | `Pair of value * value
-  | `Inl of value
-  | `Inr of value
-  | `Rec_closure of closure
-  | `Closure of closure ]
-
+type value = f Value.t
+and f = Rec_closure of closure | Closure of closure
 and closure = Ast.var * Ast.t * env
 
 and continuation_action =
@@ -50,6 +39,24 @@ and continuation = continuation_action list
 and binding = Ast.var * value
 and env = binding list
 
+let rec pp_value fmt = Value.pp pp_fun fmt
+
+and pp_fun fmt = function
+  | Closure clo -> Format.fprintf fmt "Closure(%a)" pp_closure clo
+  | Rec_closure clo -> Format.fprintf fmt "Rec_closure(%a)" pp_closure clo
+
+and pp_closure fmt (var, e, env) =
+  Format.fprintf fmt "%s, %s, %a" var (Ast.to_string e) pp_env env
+
+and pp_env fmt env =
+  Format.fprintf fmt "[%a]"
+    (Format.pp_print_list
+       ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@.")
+       pp_binding)
+    env
+
+and pp_binding fmt (x, v) = Format.fprintf fmt "(%s, %a)" x pp_value v
+
 type state =
   | INSPECT of Ast.t * env * continuation
   | COMPUTE of continuation * value
@@ -62,13 +69,13 @@ let filter_env fvars = List.filter (fun (x, _) -> List.mem x fvars)
 let mk_fun (x, body, env) =
   let fvars = Free_vars.free_vars [ x ] body in
   let smaller_env = filter_env fvars env in
-  `Closure (x, body, smaller_env)
+  `Fun (Closure (x, body, smaller_env))
 
 let mk_rec_fun (f, x, body, env) =
   let fvars = Free_vars.free_vars [ f; x ] body in
   let smaller_env = filter_env fvars env in
-  let f_binding = (f, `Rec_closure (x, body, [])) in
-  `Closure (x, body, f_binding :: smaller_env)
+  let f_binding = (f, `Fun (Rec_closure (x, body, []))) in
+  `Fun (Closure (x, body, f_binding :: smaller_env))
 
 (** for a recursive function [f] we want
     [lookup (env, f) = FUN(true, (x, body, env))] *)
@@ -78,8 +85,9 @@ let lookup (env, x) =
     | (y, v) :: rest ->
         if x = y then
           match v with
-          | `Rec_closure (z, body, _) ->
-              `Closure (z, body, (y, `Rec_closure (z, body, [])) :: rest)
+          | `Fun (Rec_closure (z, body, _)) ->
+              `Fun
+                (Closure (z, body, (y, `Fun (Rec_closure (z, body, []))) :: rest))
           | _ -> v
         else
           aux rest
@@ -87,68 +95,53 @@ let lookup (env, x) =
   aux env
 
 let string_of_list sep f l = "[" ^ String.concat sep (List.map f l) ^ "]"
-
-let rec string_of_value : value -> string = function
-  | `Ref a -> "REF(" ^ string_of_int a ^ ")"
-  | `Bool b -> string_of_bool b
-  | `Int n -> string_of_int n
-  | `Unit -> "UNIT"
-  | `Pair (v1, v2) ->
-      "PAIR(" ^ string_of_value v1 ^ ", " ^ string_of_value v2 ^ ")"
-  | `Inl v -> "INL(" ^ string_of_value v ^ ")"
-  | `Inr v -> "INR(" ^ string_of_value v ^ ")"
-  | `Closure cl -> "CLOSURE(" ^ string_of_closure cl ^ ")"
-  | `Rec_closure cl -> "REC_CLOSURE(" ^ string_of_closure cl ^ ")"
-
-and string_of_closure (x, e, env) =
-  x ^ ", " ^ Ast.to_string e ^ ", " ^ string_of_env env
-
-and string_of_env env = string_of_list ",\n " string_of_binding env
-and string_of_binding (x, v) = "(" ^ x ^ ", " ^ string_of_value v ^ ")"
-
 let string_of_expr_list = string_of_list "; " Ast.to_string
 
-let string_of_continuation_action = function
-  | UNARY op -> "UNARY " ^ Ast.Unary_op.to_string op
-  | MKPAIR v -> "MKPAIR " ^ string_of_value v
-  | FST -> "FST"
-  | SND -> "SND"
-  | MKINL -> "MKINL"
-  | MKINR -> "MKINR"
-  | APPLY v -> "APPLY " ^ string_of_value v
-  | ARG (e, env) -> "ARG(" ^ Ast.to_string e ^ ", " ^ string_of_env env ^ ")"
+let pp_continuation_action fmt = function
+  | UNARY op -> Format.fprintf fmt "UNARY %s" (Ast.Unary_op.to_string op)
+  | MKPAIR v -> Format.fprintf fmt "MKPAIR %a" pp_value v
+  | FST -> Format.fprintf fmt "FST"
+  | SND -> Format.fprintf fmt "SND"
+  | MKINL -> Format.fprintf fmt "MKINL"
+  | MKINR -> Format.fprintf fmt "MKINR"
+  | APPLY v -> Format.fprintf fmt "APPLY %a" pp_value v
+  | ARG (e, env) ->
+      Format.fprintf fmt "ARG(%s, %a)" (Ast.to_string e) pp_env env
   | OPER (op, v) ->
-      "OPER(" ^ Ast.Binary_op.to_string op ^ ", " ^ string_of_value v ^ ")"
+      Format.fprintf fmt "OPER(%s, %a)" (Ast.Binary_op.to_string op) pp_value v
   | CASE (x1, e1, x2, e2, env) ->
-      "CASE(" ^ x1 ^ ", " ^ Ast.to_string e1 ^ ", " ^ x2 ^ ", "
-      ^ Ast.to_string e2 ^ ", " ^ string_of_env env ^ ")"
+      Format.fprintf fmt "CASE(%s, %s, %s, %s, %a)" x1 (Ast.to_string e1) x2
+        (Ast.to_string e2) pp_env env
   | PAIR_FST (e, env) ->
-      "PAIR_FST(" ^ Ast.to_string e ^ ", " ^ string_of_env env ^ ")"
+      Format.fprintf fmt "PAIR_FST(%s, %a)" (Ast.to_string e) pp_env env
   | OPER_FST (e, env, op) ->
-      "OPER_FST(" ^ Ast.to_string e ^ ", " ^ string_of_env env ^ ", "
-      ^ Ast.Binary_op.to_string op ^ ")"
+      Format.fprintf fmt "OPER_FST(%s, %a, %s)" (Ast.to_string e) pp_env env
+        (Ast.Binary_op.to_string op)
   | IF (e1, e2, env) ->
-      "IF(" ^ Ast.to_string e1 ^ ", " ^ Ast.to_string e2 ^ ", "
-      ^ string_of_env env ^ ")"
-  | ASSIGN v -> "MKPAIR " ^ string_of_value v
+      Format.fprintf fmt "IF(%s, %s, %a)" (Ast.to_string e1) (Ast.to_string e2)
+        pp_env env
+  | ASSIGN v -> Format.fprintf fmt "ASSIGN %a" pp_value v
   | ASSIGN_FST (e, env) ->
-      "ASSIGN_FST(" ^ Ast.to_string e ^ ", " ^ string_of_env env ^ ")"
+      Format.fprintf fmt "ASSIGN_FST(%s, %a)" (Ast.to_string e) pp_env env
   | TAIL (el, env) ->
-      "TAIL(" ^ string_of_expr_list el ^ ", " ^ string_of_env env ^ ")"
+      Format.fprintf fmt "TAIL(%s, %a)" (string_of_expr_list el) pp_env env
   | WHILE (e1, e2, env) ->
-      "WHILE(" ^ Ast.to_string e1 ^ ", " ^ Ast.to_string e2 ^ ", "
-      ^ string_of_env env ^ ")"
-  | MKREF -> "MKREF"
-  | DEREF -> "DEREF"
+      Format.fprintf fmt "WHILE(%s, %s, %a)" (Ast.to_string e1)
+        (Ast.to_string e2) pp_env env
+  | MKREF -> Format.fprintf fmt "MKREF"
+  | DEREF -> Format.fprintf fmt "DEREF"
 
-let string_of_continuation = string_of_list ";\n " string_of_continuation_action
+let pp_continuation =
+  Format.pp_print_list
+    ~pp_sep:(fun fmt () -> Format.fprintf fmt ";@.")
+    pp_continuation_action
 
-let string_of_state = function
+let pp_state fmt = function
   | INSPECT (e, env, cnt) ->
-      "INSPECT(" ^ Ast.to_string e ^ ", " ^ string_of_env env ^ ", "
-      ^ string_of_continuation cnt ^ ")"
+      Format.fprintf fmt "INSPECT(%s, %a, %a)" (Ast.to_string e) pp_env env
+        pp_continuation cnt
   | COMPUTE (cnt, v) ->
-      "COMPUTE(" ^ string_of_continuation cnt ^ ", " ^ string_of_value v ^ ")"
+      Format.fprintf fmt "COMPUTE(%a, %a)" pp_continuation cnt pp_value v
 
 let heap = Array.make Option.heap_max (`Int 0)
 
@@ -216,9 +209,9 @@ let step = function
   (* COMPUTE --> INSPECT *)
   | COMPUTE (OPER_FST (e2, env, op) :: k, v1) ->
       INSPECT (e2, env, OPER (op, v1) :: k)
-  | COMPUTE (APPLY v2 :: k, `Closure (x, body, env)) ->
+  | COMPUTE (APPLY v2 :: k, `Fun (Closure (x, body, env))) ->
       INSPECT (body, update (x, v2) env, k)
-  | COMPUTE (APPLY v2 :: k, `Rec_closure (x, body, env)) ->
+  | COMPUTE (APPLY v2 :: k, `Fun (Rec_closure (x, body, env))) ->
       INSPECT (body, update (x, v2) env, k)
   | COMPUTE (ARG (e2, env) :: k, v) -> INSPECT (e2, env, APPLY v :: k)
   | COMPUTE (PAIR_FST (e2, env) :: k, v1) -> INSPECT (e2, env, MKPAIR v1 :: k)
@@ -232,14 +225,11 @@ let step = function
   | COMPUTE (WHILE (e1, e2, env) :: k, `Bool true) ->
       INSPECT (Seq [ e2; e1 ], env, WHILE (e1, e2, env) :: k)
   | COMPUTE (TAIL (el, env) :: k, _) -> INSPECT (Seq el, env, k)
-  | state ->
-      Errors.complain
-        ("step : malformed state = " ^ string_of_state state ^ "\n")
+  | state -> Errors.complainf "step : malformed state = %a@." pp_state state
 
 let rec driver n state =
   if Option.verbose then
-    print_string
-      ("\nstate " ^ string_of_int n ^ " = \n" ^ string_of_state state ^ "\n");
+    Format.printf "state %d =@.%a@." n pp_state state;
   match state with COMPUTE ([], v) -> v | _ -> driver (n + 1) (step state)
 
 let eval e env = driver 1 (INSPECT (e, env, []))
