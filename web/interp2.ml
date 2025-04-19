@@ -19,7 +19,7 @@ let list_of_map m =
   List.of_seq @@ Seq.map (fun (_, v) -> v) @@ Interp_2.IntMap.to_seq m
 
 let string_list_of_heap (heap, _) =
-  List.map Interp_2.string_of_value (list_of_map heap)
+  List.map (Format.asprintf "%a" Interp_2.pp_value) (list_of_map heap)
 
 let string_lists_of_steps steps =
   List.map
@@ -52,7 +52,7 @@ and string_list_of_instruction : instruction -> string list = function
   | MK_INL -> [ "MK_INL" ]
   | MK_INR -> [ "MK_INR" ]
   | MK_REF -> [ "MK_REF" ]
-  | PUSH v -> [ "PUSH " ^ string_of_value v ]
+  | PUSH v -> [ Format.asprintf "PUSH %a" Interp_2.pp_value v ]
   | LOOKUP x -> [ "LOOKUP " ^ x ]
   | TEST (c1, c2) ->
       ("TEST(" :: (tab @@ string_list_of_code c1))

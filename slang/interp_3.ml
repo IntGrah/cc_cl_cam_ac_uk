@@ -21,16 +21,8 @@ type address = int
 type label = string
 type location = label * address option
 
-type value =
-  [ `Ref of address
-  | `Int of int
-  | `Bool of bool
-  | `Unit
-  | `Pair of value * value
-  | `Inl of value
-  | `Inr of value
-  | `Closure of location * env
-  | `Rec_closure of location ]
+type value = f Value.t
+and f = Closure of location * env | Rec_closure of location
 
 and instruction =
   | PUSH of value
@@ -73,14 +65,15 @@ type state = address * env_value_stack
 (* update : (env * binding) -> env *)
 (* let update(env, (x, v)) = (x, v) :: env *)
 
-let rec lookup (env, x) =
+let rec lookup ((env, x) : env * Ast.var) : value option =
   match env with
   | [] -> None
   | (y, v) :: rest ->
       if x = y then
         Some
           (match v with
-          | `Rec_closure loc -> `Closure (loc, (y, `Rec_closure loc) :: rest)
+          | `Fun (Rec_closure loc) ->
+              `Fun (Closure (loc, (y, `Fun (Rec_closure loc)) :: rest))
           | _ -> v)
       else
         lookup (rest, x)
@@ -99,67 +92,61 @@ let rec evs_to_env = function
   | RA _ :: rest -> evs_to_env rest
   | EV env :: rest -> env @ evs_to_env rest
 
-let pr = Format.fprintf
-
 let pp_list fmt sep f l =
   let rec aux f fmt = function
     | [] -> ()
     | [ t ] -> f fmt t
-    | t :: rest -> pr fmt "%a%(%)%a" f t sep (aux f) rest
+    | t :: rest -> Format.fprintf fmt "%a%(%)%a" f t sep (aux f) rest
   in
-  pr fmt "@[[%a]@]" (aux f) l
+  Format.fprintf fmt "@[[%a]@]" (aux f) l
 
-let rec pp_value fmt : value -> unit = function
-  | `Ref a -> pr fmt "REF(%d)" a
-  | `Bool b -> pr fmt "%b" b
-  | `Int n -> pr fmt "%d" n
-  | `Unit -> pr fmt "UNIT"
-  | `Pair (v1, v2) -> pr fmt "(@[%a,@ %a)@]" pp_value v1 pp_value v2
-  | `Inl v -> pr fmt "inl(%a)" pp_value v
-  | `Inr v -> pr fmt "inr(%a)" pp_value v
-  | `Closure (loc, c) -> pr fmt "CLOSURE(%a)" pp_closure (loc, c)
-  | `Rec_closure loc -> pr fmt "REC_CLOSURE(%a)" pp_location loc
+let rec pp_value fmt : value -> unit = Value.pp pp_fun fmt
 
-and pp_closure fmt (loc, env) = pr fmt "(%a, %a)" pp_location loc pp_env env
+and pp_fun fmt = function
+  | Closure (loc, env) ->
+      Format.fprintf fmt "(%a, %a)" pp_location loc pp_env env
+  | Rec_closure _ -> Format.fprintf fmt ""
+
 and pp_env fmt env = pp_list fmt ",@\n " pp_binding env
-and pp_binding fmt (x, v) = pr fmt "(%s, %a)" x pp_value v
+and pp_binding fmt (x, v) = Format.fprintf fmt "(%s, %a)" x pp_value v
 
 and pp_location fmt = function
-  | l, None -> pr fmt "%s" l
-  | l, Some i -> pr fmt "%s = %d" l i
+  | l, None -> Format.fprintf fmt "%s" l
+  | l, Some i -> Format.fprintf fmt "%s = %d" l i
 
 and pp_instruction fmt = function
-  | UNARY op -> pr fmt "  UNARY %s" (Ast.Unary_op.to_string op)
-  | OPER op -> pr fmt "  OPER %s" (Ast.Binary_op.to_string op)
-  | MK_PAIR -> pr fmt "  MK_PAIR"
-  | FST -> pr fmt "  FST"
-  | SND -> pr fmt "  SND"
-  | MK_INL -> pr fmt "  MK_INL"
-  | MK_INR -> pr fmt "  MK_INR"
-  | MK_REF -> pr fmt "  MK_REF"
-  | PUSH v -> pr fmt "  PUSH %a" pp_value v
-  | LOOKUP x -> pr fmt "  LOOKUP %s" x
-  | TEST label -> pr fmt "  TEST %a" pp_location label
-  | CASE label -> pr fmt "  CASE %a" pp_location label
-  | GOTO label -> pr fmt "  GOTO %a" pp_location label
-  | APPLY -> pr fmt "  APPLY"
-  | RETURN -> pr fmt "  RETURN"
-  | HALT -> pr fmt "  HALT"
-  | BIND x -> pr fmt "  BIND %s" x
-  | LABEL label -> pr fmt "LABEL %s:" label
-  | SWAP -> pr fmt "  SWAP"
-  | POP -> pr fmt "  POP"
-  | DEREF -> pr fmt "  DEREF"
-  | ASSIGN -> pr fmt "  ASSIGN"
-  | MK_CLOSURE loc -> pr fmt "  MK_CLOSURE(%a)" pp_location loc
-  | MK_REC (v, loc) -> pr fmt "  MK_REC(@[%s, %a)@]" v pp_location loc
+  | UNARY op -> Format.fprintf fmt "  UNARY %s" (Ast.Unary_op.to_string op)
+  | OPER op -> Format.fprintf fmt "  OPER %s" (Ast.Binary_op.to_string op)
+  | MK_PAIR -> Format.fprintf fmt "  MK_PAIR"
+  | FST -> Format.fprintf fmt "  FST"
+  | SND -> Format.fprintf fmt "  SND"
+  | MK_INL -> Format.fprintf fmt "  MK_INL"
+  | MK_INR -> Format.fprintf fmt "  MK_INR"
+  | MK_REF -> Format.fprintf fmt "  MK_REF"
+  | PUSH v -> Format.fprintf fmt "  PUSH %a" pp_value v
+  | LOOKUP x -> Format.fprintf fmt "  LOOKUP %s" x
+  | TEST label -> Format.fprintf fmt "  TEST %a" pp_location label
+  | CASE label -> Format.fprintf fmt "  CASE %a" pp_location label
+  | GOTO label -> Format.fprintf fmt "  GOTO %a" pp_location label
+  | APPLY -> Format.fprintf fmt "  APPLY"
+  | RETURN -> Format.fprintf fmt "  RETURN"
+  | HALT -> Format.fprintf fmt "  HALT"
+  | BIND x -> Format.fprintf fmt "  BIND %s" x
+  | LABEL label -> Format.fprintf fmt "LABEL %s:" label
+  | SWAP -> Format.fprintf fmt "  SWAP"
+  | POP -> Format.fprintf fmt "  POP"
+  | DEREF -> Format.fprintf fmt "  DEREF"
+  | ASSIGN -> Format.fprintf fmt "  ASSIGN"
+  | MK_CLOSURE loc -> Format.fprintf fmt "  MK_CLOSURE(%a)" pp_location loc
+  | MK_REC (v, loc) ->
+      Format.fprintf fmt "  MK_REC(@[%s, %a)@]" v pp_location loc
 
-and pp_code fmt c = List.iter (pr fmt "%a@\n" pp_instruction) c
+and pp_code fmt c = List.iter (Format.fprintf fmt "%a@\n" pp_instruction) c
 
 let pp_env_or_value fmt = function
-  | EV env -> pr fmt "EV %a" pp_env env
-  | V v -> pr fmt "V %a" pp_value v
-  | RA i -> pr fmt "RA %d" i
+  | EV env -> Format.fprintf fmt "EV %a" pp_env env
+  | V v -> Format.fprintf fmt "V %a" pp_value v
+  | RA i -> Format.fprintf fmt "RA %d" i
 
 let pp_env_value_stack fmt = pp_list fmt ";@\n " pp_env_or_value
 let string_of_value = Format.asprintf "%a" pp_value
@@ -175,7 +162,8 @@ let pp_installed_code fmt =
   let size = Array.length !installed in
   let rec aux fmt k =
     if size <> k then
-      pr fmt "%d: %a@\n%a" k pp_instruction !installed.(k) aux (k + 1)
+      Format.fprintf fmt "%d: %a@\n%a" k pp_instruction !installed.(k) aux
+        (k + 1)
   in
   aux fmt 0
 
@@ -201,8 +189,8 @@ let string_of_heap () =
   "\nHeap = \n" ^ aux 0
 
 let pp_state fmt (cp, evs) =
-  pr fmt "@\nCode Pointer = %d -> %a@\nStack = %a%s@\n" cp pp_instruction
-    (get_instruction cp) pp_env_value_stack evs
+  Format.fprintf fmt "@\nCode Pointer = %d -> %a@\nStack = %a%s@\n" cp
+    pp_instruction (get_instruction cp) pp_env_value_stack evs
     (if !next_address = 0 then
        ""
      else
@@ -235,11 +223,13 @@ let step (cp, evs) =
       let a = new_address () in
       heap.(a) <- v;
       (cp + 1, V (`Ref a) :: evs)
-  | MK_CLOSURE loc, evs -> (cp + 1, V (`Closure (loc, evs_to_env evs)) :: evs)
+  | MK_CLOSURE loc, evs ->
+      (cp + 1, V (`Fun (Closure (loc, evs_to_env evs))) :: evs)
   | MK_REC (f, loc), evs ->
       ( cp + 1,
-        V (`Closure (loc, (f, `Rec_closure loc) :: evs_to_env evs)) :: evs )
-  | APPLY, V (`Closure ((_, Some i), env)) :: V v :: evs ->
+        V (`Fun (Closure (loc, (f, `Fun (Rec_closure loc)) :: evs_to_env evs)))
+        :: evs )
+  | APPLY, V (`Fun (Closure ((_, Some i), env))) :: V v :: evs ->
       (i, V v :: EV env :: RA (cp + 1) :: evs)
   (* new intructions *)
   | RETURN, V v :: _ :: RA i :: evs -> (i, V v :: evs)

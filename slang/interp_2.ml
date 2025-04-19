@@ -25,17 +25,8 @@ module IntMap = Map.Make (Int)
 type address = int
 type var = string
 
-type value =
-  [ `Ref of address
-  | `Int of int
-  | `Bool of bool
-  | `Unit
-  | `Pair of value * value
-  | `Inl of value
-  | `Inr of value
-  | `Closure of closure
-  | `Rec_closure of code ]
-
+type value = f Value.t
+and f = Closure of code * env | Rec_closure of code
 and closure = code * env
 
 and instruction =
@@ -75,76 +66,72 @@ type interp_state = code * env_value_stack * state
 
 (* Printing *)
 
-let pr = Format.fprintf
-
 let pp_list fmt sep f l =
   let rec aux f fmt = function
     | [] -> ()
     | [ t ] -> f fmt t
-    | t :: rest -> pr fmt "%a%(%)%a" f t sep (aux f) rest
+    | t :: rest -> Format.fprintf fmt "%a%(%)%a" f t sep (aux f) rest
   in
-  pr fmt "@[[%a]@]" (aux f) l
+  Format.fprintf fmt "@[[%a]@]" (aux f) l
 
-let rec pp_value fmt : value -> unit = function
-  | `Ref a -> pr fmt "REF(%d)" a
-  | `Bool b -> pr fmt "%b" b
-  | `Int n -> pr fmt "%d" n
-  | `Unit -> pr fmt "UNIT"
-  | `Pair (v1, v2) -> pr fmt "(%a, %a)" pp_value v1 pp_value v2
-  | `Inl v -> pr fmt "inl(%a)" pp_value v
-  | `Inr v -> pr fmt "inr(%a)" pp_value v
-  | `Closure cl -> pr fmt "CLOSURE(%a)" pp_closure cl
-  | `Rec_closure c -> pr fmt "REC_CLOSURE(%a)" pp_code c
+let rec pp_value fmt = Value.pp pp_fun fmt
 
-and pp_closure fmt (c, env) = pr fmt "(%a, %a)" pp_code c pp_env env
+and pp_fun fmt = function
+  | Closure (c, env) ->
+      Format.fprintf fmt "CLOSURE(%a, %a)" pp_code c pp_env env
+  | Rec_closure c -> Format.fprintf fmt "REC_CLOSURE(%a)" pp_code c
+
 and pp_env fmt env = pp_list fmt ",@\n " pp_binding env
-and pp_binding fmt (x, v) = pr fmt "(%s, %a)" x pp_value v
+and pp_binding fmt (x, v) = Format.fprintf fmt "(%s, %a)" x pp_value v
 
 and pp_instruction fmt = function
-  | UNARY op -> pr fmt "@[UNARY %s@]" (Ast.Unary_op.to_string op)
-  | OPER op -> pr fmt "@[OPER %s@]" (Ast.Binary_op.to_string op)
-  | MK_PAIR -> pr fmt "MK_PAIR"
-  | FST -> pr fmt "FST"
-  | SND -> pr fmt "SND"
-  | MK_INL -> pr fmt "MK_INL"
-  | MK_INR -> pr fmt "MK_INR"
-  | MK_REF -> pr fmt "MK_REF"
-  | PUSH v -> pr fmt "PUSH %a" pp_value v
-  | LOOKUP x -> pr fmt "LOOKUP %s" x
-  | TEST (c1, c2) -> pr fmt "TEST(@[%a,@ %a)@]" pp_code c1 pp_code c2
-  | CASE (c1, c2) -> pr fmt "CASE(@[%a,@ %a)@]" pp_code c1 pp_code c2
-  | WHILE (c1, c2) -> pr fmt "WHILE(@[%a,@ %a)@]" pp_code c1 pp_code c2
-  | APPLY -> pr fmt "APPLY"
-  | BIND x -> pr fmt "BIND %s" x
-  | SWAP -> pr fmt "SWAP"
-  | POP -> pr fmt "POP"
-  | DEREF -> pr fmt "DEREF"
-  | ASSIGN -> pr fmt "ASSIGN"
-  | MK_CLOSURE c -> pr fmt "MK_CLOSURE(%a)" pp_code c
-  | MK_REC (f, c) -> pr fmt "MK_REC(@[%s, %a)@]" f pp_code c
+  | UNARY op -> Format.fprintf fmt "@[UNARY %s@]" (Ast.Unary_op.to_string op)
+  | OPER op -> Format.fprintf fmt "@[OPER %s@]" (Ast.Binary_op.to_string op)
+  | MK_PAIR -> Format.fprintf fmt "MK_PAIR"
+  | FST -> Format.fprintf fmt "FST"
+  | SND -> Format.fprintf fmt "SND"
+  | MK_INL -> Format.fprintf fmt "MK_INL"
+  | MK_INR -> Format.fprintf fmt "MK_INR"
+  | MK_REF -> Format.fprintf fmt "MK_REF"
+  | PUSH v -> Format.fprintf fmt "PUSH %a" pp_value v
+  | LOOKUP x -> Format.fprintf fmt "LOOKUP %s" x
+  | TEST (c1, c2) ->
+      Format.fprintf fmt "TEST(@[%a,@ %a)@]" pp_code c1 pp_code c2
+  | CASE (c1, c2) ->
+      Format.fprintf fmt "CASE(@[%a,@ %a)@]" pp_code c1 pp_code c2
+  | WHILE (c1, c2) ->
+      Format.fprintf fmt "WHILE(@[%a,@ %a)@]" pp_code c1 pp_code c2
+  | APPLY -> Format.fprintf fmt "APPLY"
+  | BIND x -> Format.fprintf fmt "BIND %s" x
+  | SWAP -> Format.fprintf fmt "SWAP"
+  | POP -> Format.fprintf fmt "POP"
+  | DEREF -> Format.fprintf fmt "DEREF"
+  | ASSIGN -> Format.fprintf fmt "ASSIGN"
+  | MK_CLOSURE c -> Format.fprintf fmt "MK_CLOSURE(%a)" pp_code c
+  | MK_REC (f, c) -> Format.fprintf fmt "MK_REC(@[%s, %a)@]" f pp_code c
 
 and pp_code fmt c = pp_list fmt ";@\n " pp_instruction c
 
 let pp_env_or_value fmt = function
-  | EV env -> pr fmt "EV %a" pp_env env
-  | V v -> pr fmt "V %a" pp_value v
+  | EV env -> Format.fprintf fmt "EV %a" pp_env env
+  | V v -> Format.fprintf fmt "V %a" pp_value v
 
 let pp_env_value_stack fmt n = pp_list fmt ";@\n " pp_env_or_value n
 
 let pp_state fmt (heap, i) =
   let rec aux fmt k =
     if i > k then
-      pr fmt "%d -> %a@\n%a" k pp_value (IntMap.find k heap) aux (k + 1)
+      Format.fprintf fmt "%d -> %a@\n%a" k pp_value (IntMap.find k heap) aux
+        (k + 1)
   in
   if i <> 0 then
-    pr fmt "@\nHeap = @\n%a" aux 0
+    Format.fprintf fmt "@\nHeap = @\n%a" aux 0
 
 let pp_interp_state fmt (c, evs, s) =
-  pr fmt "@\nCode Stack = @\n%a@\nEnv/Value Stack = @\n%a%a" pp_code c
-    pp_env_value_stack evs pp_state s
+  Format.fprintf fmt "@\nCode Stack = @\n%a@\nEnv/Value Stack = @\n%a%a" pp_code
+    c pp_env_value_stack evs pp_state s
 
 let string_of_instruction = Format.asprintf "%a" pp_instruction
-let string_of_value = Format.asprintf "%a" pp_value
 let string_of_env_or_value = Format.asprintf "%a" pp_env_or_value
 let string_of_code = Format.asprintf "%a" pp_code
 
@@ -164,8 +151,8 @@ let assign (heap, i) a v =
   let heap = IntMap.add a v heap in
   (heap, i)
 
-let mk_fun (c, env) = `Closure (c, env)
-let mk_rec (f, c, env) = `Closure (c, (f, `Rec_closure c) :: env)
+let mk_fun (c, env) = `Fun (Closure (c, env))
+let mk_rec (f, c, env) = `Fun (Closure (c, (f, `Fun (Rec_closure c)) :: env))
 
 (*
    in interp_0:
@@ -183,7 +170,7 @@ let mk_rec (f, c, env) = `Closure (c, (f, `Rec_closure c) :: env)
 *)
 let rec lookup_opt = function
   | [], _ -> None
-  | (y, `Rec_closure body) :: rest, x when x = y ->
+  | (y, `Fun (Rec_closure body)) :: rest, x when x = y ->
       Some (mk_rec (x, body, rest))
   | (y, v) :: _, x when x = y -> Some v
   | (_, _) :: rest, x -> lookup_opt (rest, x)
@@ -233,7 +220,7 @@ let step : interp_state -> interp_state = function
   | MK_CLOSURE c :: ds, evs, s -> (ds, V (mk_fun (c, evs_to_env evs)) :: evs, s)
   | MK_REC (f, c) :: ds, evs, s ->
       (ds, V (mk_rec (f, c, evs_to_env evs)) :: evs, s)
-  | APPLY :: ds, V (`Closure (c, env)) :: V v :: evs, s ->
+  | APPLY :: ds, V (`Fun (Closure (c, env))) :: V v :: evs, s ->
       (c @ ds, V v :: EV env :: evs, s)
   | state -> Errors.complainf "step : bad state = %a\n" pp_interp_state state
 
@@ -242,7 +229,7 @@ let rec driver n state =
     if Option.verbose then
       Format.printf "\nState %d : %a@." n pp_interp_state state
   in
-  match state with [], [ V v ], s -> (v, s) | _ -> driver (n + 1) (step state)
+  match state with [], [ V v ], _ -> v | _ -> driver (n + 1) (step state)
 
 (* A BIND will leave an env on stack.
    This gets rid of it.  *)

@@ -26,32 +26,15 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
 
 type address = int
 
-type value =
-  [ `Ref of address
-  | `Int of int
-  | `Bool of bool
-  | `Unit
-  | `Pair of value * value
-  | `Inl of value
-  | `Inr of value
-  | `Fun of value -> store -> value * store ]
-
+type value = (value -> store -> value * store) Value.t
 and store = address -> value
+
+let rec pp_value fmt : value -> unit = Value.pp pp_fun fmt
+and pp_fun fmt _ = Format.fprintf fmt "Function(...)"
 
 type env = Ast.var -> value
 
 (* Auxiliary functions *)
-
-let rec string_of_value : value -> string = function
-  | `Ref a -> Format.sprintf "address(%d)" a
-  | `Bool b -> Format.sprintf "%b" b
-  | `Int n -> Format.sprintf "%d" n
-  | `Unit -> "()"
-  | `Pair (v1, v2) ->
-      Format.sprintf "(%s, %s)" (string_of_value v1) (string_of_value v2)
-  | `Inl v -> Format.sprintf "inl(%s)" (string_of_value v)
-  | `Inr v -> Format.sprintf "inr(%s)" (string_of_value v)
-  | `Fun _ -> "function( ... )"
 
 let update (x, v) env =
  fun y ->
