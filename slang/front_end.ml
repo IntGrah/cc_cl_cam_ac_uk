@@ -1,5 +1,5 @@
 let error filename action s =
-  Errors.complain ("\nERROR in " ^ filename ^ " with " ^ action ^ " : " ^ s ^ "\n")
+  Errors.complainf "ERROR in %s with %s : %s@." filename action s
 
 let print_if_verbose m pp e =
   if Option.verbose_front then (
