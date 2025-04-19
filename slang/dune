@@ -4,7 +4,26 @@
 
 (library
  (name slanglib)
- (libraries control)
+ (modules
+  Front_end
+  Lexer
+  Parser
+  Ast
+  Past
+  Type
+  Errors
+  Free_vars
+  Interp_0
+  Interp_1
+  Interp_2
+  Interp_3
+  Jargon
+  Jargon_to_x86
+  Value
+  Tests
+  Pptree
+  Static
+  Option)
  (preprocess
   (pps ppx_deriving_yojson)))
 
