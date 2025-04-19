@@ -81,7 +81,11 @@ and pp_fun fmt = function
       Format.fprintf fmt "CLOSURE(%a, %a)" pp_code c pp_env env
   | Rec_closure c -> Format.fprintf fmt "REC_CLOSURE(%a)" pp_code c
 
-and pp_env fmt env = pp_list fmt ",@\n " pp_binding env
+and pp_env fmt =
+  Format.pp_print_list
+    ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+    pp_binding fmt
+
 and pp_binding fmt (x, v) = Format.fprintf fmt "(%s, %a)" x pp_value v
 
 and pp_instruction fmt = function
@@ -110,13 +114,13 @@ and pp_instruction fmt = function
   | MK_CLOSURE c -> Format.fprintf fmt "MK_CLOSURE(%a)" pp_code c
   | MK_REC (f, c) -> Format.fprintf fmt "MK_REC(@[%s, %a)@]" f pp_code c
 
-and pp_code fmt c = pp_list fmt ";@\n " pp_instruction c
+and pp_code fmt c = pp_list fmt ";@ " pp_instruction c
 
 let pp_env_or_value fmt = function
   | EV env -> Format.fprintf fmt "EV %a" pp_env env
   | V v -> Format.fprintf fmt "V %a" pp_value v
 
-let pp_env_value_stack fmt n = pp_list fmt ";@\n " pp_env_or_value n
+let pp_env_value_stack fmt n = pp_list fmt ";@." pp_env_or_value n
 
 let pp_state fmt (heap, i) =
   let rec aux fmt k =
@@ -131,7 +135,6 @@ let pp_interp_state fmt (c, evs, s) =
   Format.fprintf fmt "@\nCode Stack = @\n%a@\nEnv/Value Stack = @\n%a%a" pp_code
     c pp_env_value_stack evs pp_state s
 
-let string_of_instruction = Format.asprintf "%a" pp_instruction
 let string_of_env_or_value = Format.asprintf "%a" pp_env_or_value
 let string_of_code = Format.asprintf "%a" pp_code
 

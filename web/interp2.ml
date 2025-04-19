@@ -12,7 +12,9 @@ let steps e =
   let c = Interp_2.compile e in
   driver (c, Interp_2.initial_env, Interp_2.initial_state)
 
-let string_list_of_code code = List.map Interp_2.string_of_instruction code
+let string_list_of_code code =
+  List.map (Format.asprintf "%a" Interp_2.pp_instruction) code
+
 let string_list_of_env env = List.map Interp_2.string_of_env_or_value env
 
 let list_of_map m =

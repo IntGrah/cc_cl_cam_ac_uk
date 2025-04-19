@@ -46,7 +46,7 @@ val initial_env : env_value_stack
 val step : interp_state -> interp_state
 val compile : Ast.t -> code
 val interpret : Ast.t -> value
-val string_of_instruction : instruction -> string
+val pp_instruction : Format.formatter -> instruction -> unit
 val pp_value : Format.formatter -> value -> unit
 val string_of_env_or_value : env_or_value -> string
 val string_of_code : code -> string
