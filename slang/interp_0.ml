@@ -26,7 +26,8 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
 
 type address = int
 
-type value = (value -> store -> value * store) Value.t
+type value = f Value.t
+and f = Run of (value -> store -> value * store)
 and store = address -> value
 
 let rec pp_value fmt : value -> unit = Value.pp pp_fun fmt
@@ -52,11 +53,11 @@ let new_address =
 
 let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
   match e with
-  | Unit -> (`Unit, store)
+  | Unit -> (Unit, store)
   | Var x -> (env x, store)
-  | Integer n -> (`Int n, store)
-  | Boolean b -> (`Bool b, store)
-  | Seq [] -> (`Unit, store) (* should not be seen ... *)
+  | Integer n -> (Int n, store)
+  | Boolean b -> (Bool b, store)
+  | Seq [] -> (Unit, store) (* should not be seen ... *)
   | Seq [ e ] -> interp e env store
   | Seq (e :: rest) ->
       let _, store = interp e env store in
@@ -64,23 +65,23 @@ let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
   | While (e1, e2) -> (
       let v, store = interp e1 env store in
       match v with
-      | `Bool true -> interp (Seq [ e2; e ]) env store
-      | `Bool false -> (`Unit, store)
+      | Bool true -> interp (Seq [ e2; e ]) env store
+      | Bool false -> (Unit, store)
       | _ -> Errors.complain "Runtime error: expecting a boolean!")
   | Ref e ->
       let v, store = interp e env store in
       let a = new_address () in
-      (`Ref a, update (a, v) store)
+      (Ref a, update (a, v) store)
   | Deref e -> (
       let v, store = interp e env store in
       match v with
-      | `Ref a -> (store a, store)
+      | Ref a -> (store a, store)
       | _ -> Errors.complain "Runtime error: expecting an address!")
   | Assign (e1, e2) -> (
       match interp e1 env store with
-      | `Ref a, store ->
+      | Ref a, store ->
           let v, store = interp e2 env store in
-          (`Unit, update (a, v) store)
+          (Unit, update (a, v) store)
       | _ ->
           Errors.complain
             "Runtime error: expecting an address on left side of assignment")
@@ -94,50 +95,52 @@ let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
   | If (e1, e2, e3) -> (
       let v, store = interp e1 env store in
       match v with
-      | `Bool true -> interp e2 env store
-      | `Bool false -> interp e3 env store
+      | Bool true -> interp e2 env store
+      | Bool false -> interp e3 env store
       | _ -> Errors.complain "Runtime error: expecting a boolean")
   | Pair (e1, e2) ->
       let v1, store = interp e1 env store in
       let v2, store = interp e2 env store in
-      (`Pair (v1, v2), store)
+      (Pair (v1, v2), store)
   | Fst e -> (
       match interp e env store with
-      | `Pair (v1, _), store -> (v1, store)
+      | Pair (v1, _), store -> (v1, store)
       | _ -> Errors.complain "Runtime error: expecting a pair")
   | Snd e -> (
       match interp e env store with
-      | `Pair (_, v2), store -> (v2, store)
+      | Pair (_, v2), store -> (v2, store)
       | _ -> Errors.complain "Runtime error: expecting a pair")
   | Inl e ->
       let v, store = interp e env store in
-      (`Inl v, store)
+      (Inl v, store)
   | Inr e ->
       let v, store = interp e env store in
-      (`Inr v, store)
+      (Inr v, store)
   | Case (e, (x1, e1), (x2, e2)) -> (
       let v, store = interp e env store in
       match v with
-      | `Inl v' -> interp e1 (update (x1, v') env) store
-      | `Inr v' -> interp e2 (update (x2, v') env) store
+      | Inl v' -> interp e1 (update (x1, v') env) store
+      | Inr v' -> interp e2 (update (x2, v') env) store
       | _ -> Errors.complain "Runtime error: expecting inl or inr")
-  | Lambda (x, e) -> (`Fun (fun v -> interp e (update (x, v) env)), store)
+  | Lambda (x, e) -> (Fun (Run (fun v -> interp e (update (x, v) env))), store)
   | App (e1, e2) -> (
       let v2, store = interp e2 env store in
       let v1, store = interp e1 env store in
       match v1 with
-      | `Fun f -> f v2 store
+      | Fun (Run f) -> f v2 store
       | _ -> Errors.complain "Runtime error: expecting a function")
   | LetFun (f, (x, body), e) ->
-      let new_env =
-        update (f, `Fun (fun v -> interp body (update (x, v) env))) env
+      let env =
+        update
+          (f, Value.Fun (Run (fun v -> interp body (update (x, v) env))))
+          env
       in
-      interp e new_env store
+      interp e env store
   | LetRecFun (f, (x, body), e) ->
-      let rec new_env g =
+      let rec new_env g : value =
         (* A recursive environment! *)
         if g = f then
-          `Fun (fun v -> interp body (update (x, v) new_env))
+          Fun (Run (fun v -> interp body (update (x, v) new_env)))
         else
           env g
       in

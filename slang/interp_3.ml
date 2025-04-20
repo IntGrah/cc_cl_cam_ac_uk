@@ -50,7 +50,6 @@ and instruction =
   | LABEL of label
   | HALT
 
-and code = instruction list
 and binding = Ast.var * value
 and env = binding list
 
@@ -60,31 +59,34 @@ type env_or_value =
   | RA of address (* a return address on the run-time stack *)
 
 type env_value_stack = env_or_value list
-type state = address * env_value_stack
 
-(* update : (env * binding) -> env *)
-(* let update(env, (x, v)) = (x, v) :: env *)
+module Int_map = Map.Make (Int)
 
-let rec lookup ((env, x) : env * Ast.var) : value option =
-  match env with
+type state = {
+  next_heap_address : address;
+  heap : value Int_map.t;
+  cp : int;
+  stack : env_value_stack;
+}
+
+let init_state =
+  { next_heap_address = 0; heap = Int_map.empty; cp = 0; stack = [] }
+
+let rec lookup x : env -> value option = function
   | [] -> None
-  | (y, v) :: rest ->
-      if x = y then
-        Some
-          (match v with
-          | `Fun (Rec_closure loc) ->
-              `Fun (Closure (loc, (y, `Fun (Rec_closure loc)) :: rest))
-          | _ -> v)
-      else
-        lookup (rest, x)
+  | (y, v) :: rest when x = y ->
+      Some
+        (match v with
+        | Fun (Rec_closure loc) ->
+            Fun (Closure (loc, (y, Fun (Rec_closure loc)) :: rest))
+        | _ -> v)
+  | _ :: rest -> lookup x rest
 
-let rec search (evs, x) =
-  match evs with
+let rec search x : env_value_stack -> value = function
   | [] -> Errors.complainf "%s is not defined!@\n" x
-  | V _ :: rest -> search (rest, x)
-  | RA _ :: rest -> search (rest, x)
+  | V _ :: rest | RA _ :: rest -> search x rest
   | EV env :: rest -> (
-      match lookup (env, x) with None -> search (rest, x) | Some v -> v)
+      match lookup x env with None -> search x rest | Some v -> v)
 
 let rec evs_to_env = function
   | [] -> []
@@ -141,7 +143,12 @@ and pp_instruction fmt = function
   | MK_REC (v, loc) ->
       Format.fprintf fmt "  MK_REC(@[%s, %a)@]" v pp_location loc
 
-and pp_code fmt c = List.iter (Format.fprintf fmt "%a@\n" pp_instruction) c
+and pp_code fmt code =
+  let annotated_code = List.mapi (fun i c -> (i, c)) code in
+  Format.pp_print_list
+    ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.")
+    (fun fmt (i, c) -> Format.fprintf fmt "%d: %a" i pp_instruction c)
+    fmt annotated_code
 
 let pp_env_or_value fmt = function
   | EV env -> Format.fprintf fmt "EV %a" pp_env env
@@ -152,187 +159,195 @@ let pp_env_value_stack fmt = pp_list fmt ";@\n " pp_env_or_value
 
 (* THE MACHINE *)
 
-let installed = ref (Array.of_list [ HALT ])
-
-let pp_installed_code fmt =
-  let size = Array.length !installed in
-  let rec aux fmt k =
-    if size <> k then
-      Format.fprintf fmt "%d: %a@\n%a" k pp_instruction !installed.(k) aux
-        (k + 1)
-  in
-  aux fmt 0
-
-let string_of_installed_code () =
-  Format.asprintf "%a" (fun f () -> pp_installed_code f) ()
-
-let get_instruction cp = Array.get !installed cp
-let heap = Array.make Option.heap_max (`Int 0)
-let next_address = ref 0
-
-let new_address () =
+let incr (next_address : address ref) : address =
   let a = !next_address in
   next_address := a + 1;
   a
 
-let pp_heap fmt =
+let pp_heap fmt { next_heap_address; heap; _ } : unit =
   let rec aux fmt k =
-    if !next_address < k then
-      ()
-    else
-      Format.fprintf fmt "%d -> %a\n%a" k pp_value heap.(k) aux (k + 1)
+    if k < next_heap_address then
+      Format.fprintf fmt "%d -> %a@.%a" k pp_value (Int_map.find k heap) aux
+        (k + 1)
   in
-  Format.fprintf fmt "\nHeap = \n%a" aux 0
+  aux fmt 0
 
-let pp_state fmt (cp, evs) =
-  Format.fprintf fmt "@\nCode Pointer = %d -> %a@.Stack = %a@." cp
-    pp_instruction (get_instruction cp) pp_env_value_stack evs;
-  if !next_address <> 0 then
-    pp_heap fmt
+let pp_state code fmt ({ cp; stack; _ } as state : state) =
+  Format.fprintf fmt "Code Pointer = %d -> %a@.Stack = %a@.Heap = %a@." cp
+    pp_instruction code.(cp) pp_env_value_stack stack pp_heap state
 
-let step (cp, evs) =
-  match (get_instruction cp, evs) with
-  | PUSH v, evs -> (cp + 1, V v :: evs)
-  | POP, _ :: evs -> (cp + 1, evs)
-  | SWAP, s1 :: s2 :: evs -> (cp + 1, s2 :: s1 :: evs)
-  | BIND x, V v :: evs -> (cp + 1, EV [ (x, v) ] :: evs)
-  | LOOKUP x, evs -> (cp + 1, V (search (evs, x)) :: evs)
-  | UNARY op, V v :: evs -> (cp + 1, V (Ast.Unary_op.to_fun op v) :: evs)
+let step code ({ cp; stack; next_heap_address; heap } as state : state) : state
+    =
+  match (code.(cp), stack) with
+  | PUSH v, evs -> { state with cp = cp + 1; stack = V v :: evs }
+  | POP, _ :: evs -> { state with cp = cp + 1; stack = evs }
+  | SWAP, s1 :: s2 :: evs -> { state with cp = cp + 1; stack = s2 :: s1 :: evs }
+  | BIND x, V v :: evs ->
+      { state with cp = cp + 1; stack = EV [ (x, v) ] :: evs }
+  | LOOKUP x, evs -> { state with cp = cp + 1; stack = V (search x evs) :: evs }
+  | UNARY op, V v :: evs ->
+      { state with cp = cp + 1; stack = V (Ast.Unary_op.to_fun op v) :: evs }
   | OPER op, V v2 :: V v1 :: evs ->
-      (cp + 1, V (Ast.Binary_op.to_fun op (v1, v2)) :: evs)
-  | MK_PAIR, V v2 :: V v1 :: evs -> (cp + 1, V (`Pair (v1, v2)) :: evs)
-  | FST, V (`Pair (v, _)) :: evs -> (cp + 1, V v :: evs)
-  | SND, V (`Pair (_, v)) :: evs -> (cp + 1, V v :: evs)
-  | MK_INL, V v :: evs -> (cp + 1, V (`Inl v) :: evs)
-  | MK_INR, V v :: evs -> (cp + 1, V (`Inr v) :: evs)
-  | CASE (_, Some _), V (`Inl v) :: evs -> (cp + 1, V v :: evs)
-  | CASE (_, Some i), V (`Inr v) :: evs -> (i, V v :: evs)
-  | TEST (_, Some _), V (`Bool true) :: evs -> (cp + 1, evs)
-  | TEST (_, Some i), V (`Bool false) :: evs -> (i, evs)
-  | ASSIGN, V v :: V (`Ref a) :: evs ->
-      heap.(a) <- v;
-      (cp + 1, V `Unit :: evs)
-  | DEREF, V (`Ref a) :: evs -> (cp + 1, V heap.(a) :: evs)
+      {
+        state with
+        cp = cp + 1;
+        stack = V (Ast.Binary_op.to_fun op (v1, v2)) :: evs;
+      }
+  | MK_PAIR, V v2 :: V v1 :: evs ->
+      { state with cp = cp + 1; stack = V (Pair (v1, v2)) :: evs }
+  | FST, V (Pair (v, _)) :: evs ->
+      { state with cp = cp + 1; stack = V v :: evs }
+  | SND, V (Pair (_, v)) :: evs ->
+      { state with cp = cp + 1; stack = V v :: evs }
+  | MK_INL, V v :: evs -> { state with cp = cp + 1; stack = V (Inl v) :: evs }
+  | MK_INR, V v :: evs -> { state with cp = cp + 1; stack = V (Inr v) :: evs }
+  | CASE (_, Some _), V (Inl v) :: evs ->
+      { state with cp = cp + 1; stack = V v :: evs }
+  | CASE (_, Some i), V (Inr v) :: evs ->
+      { state with cp = i; stack = V v :: evs }
+  | TEST (_, Some _), V (Bool true) :: evs ->
+      { state with cp = cp + 1; stack = evs }
+  | TEST (_, Some i), V (Bool false) :: evs ->
+      { state with cp = i; stack = evs }
+  | ASSIGN, V v :: V (Ref a) :: evs ->
+      {
+        state with
+        cp = cp + 1;
+        stack = V Unit :: evs;
+        heap = Int_map.add a v heap;
+      }
+  | DEREF, V (Ref a) :: evs ->
+      { state with cp = cp + 1; stack = V (Int_map.find a heap) :: evs }
   | MK_REF, V v :: evs ->
-      let a = new_address () in
-      heap.(a) <- v;
-      (cp + 1, V (`Ref a) :: evs)
+      {
+        cp = cp + 1;
+        stack = V (Ref next_heap_address) :: evs;
+        next_heap_address = next_heap_address + 1;
+        heap = Int_map.add next_heap_address v heap;
+      }
   | MK_CLOSURE loc, evs ->
-      (cp + 1, V (`Fun (Closure (loc, evs_to_env evs))) :: evs)
+      {
+        state with
+        cp = cp + 1;
+        stack = V (Fun (Closure (loc, evs_to_env evs))) :: evs;
+      }
   | MK_REC (f, loc), evs ->
-      ( cp + 1,
-        V (`Fun (Closure (loc, (f, `Fun (Rec_closure loc)) :: evs_to_env evs)))
-        :: evs )
-  | APPLY, V (`Fun (Closure ((_, Some i), env))) :: V v :: evs ->
-      (i, V v :: EV env :: RA (cp + 1) :: evs)
+      {
+        state with
+        cp = cp + 1;
+        stack =
+          V (Fun (Closure (loc, (f, Fun (Rec_closure loc)) :: evs_to_env evs)))
+          :: evs;
+      }
+  | APPLY, V (Fun (Closure ((_, Some i), env))) :: V v :: evs ->
+      { state with cp = i; stack = V v :: EV env :: RA (cp + 1) :: evs }
   (* new intructions *)
-  | RETURN, V v :: _ :: RA i :: evs -> (i, V v :: evs)
-  | LABEL _, evs -> (cp + 1, evs)
-  | HALT, evs -> (cp, evs)
-  | GOTO (_, Some i), evs -> (i, evs)
-  | _ -> Errors.complainf "step : bad state = %a\n" pp_state (cp, evs)
+  | RETURN, V v :: _ :: RA i :: evs -> { state with cp = i; stack = V v :: evs }
+  | LABEL _, evs -> { state with cp = cp + 1; stack = evs }
+  | HALT, evs -> { state with cp; stack = evs }
+  | GOTO (_, Some i), evs -> { state with cp = i; stack = evs }
+  | _ -> Errors.complainf "step : bad state = %a\n" (pp_state code) state
 
 (* COMPILE *)
 
-let label_ref = ref 0
+let compile e =
+  let label_ref = ref 0 in
 
-let new_label =
-  let get () =
+  let new_label () =
     let v = !label_ref in
     label_ref := !label_ref + 1;
-    "L" ^ string_of_int v
+    Format.sprintf "L%d" v
   in
-  get
 
-let rec comp : Ast.t -> code * code = function
-  | Unit -> ([], [ PUSH `Unit ])
-  | Integer n -> ([], [ PUSH (`Int n) ])
-  | Boolean b -> ([], [ PUSH (`Bool b) ])
-  | Var x -> ([], [ LOOKUP x ])
-  | UnaryOp (op, e) ->
-      let defs, c = comp e in
-      (defs, c @ [ UNARY op ])
-  | BinaryOp (e1, op, e2) ->
-      let defs1, c1 = comp e1 in
-      let defs2, c2 = comp e2 in
-      (defs1 @ defs2, c1 @ c2 @ [ OPER op ])
-  | Pair (e1, e2) ->
-      let defs1, c1 = comp e1 in
-      let defs2, c2 = comp e2 in
-      (defs1 @ defs2, c1 @ c2 @ [ MK_PAIR ])
-  | Fst e ->
-      let defs, c = comp e in
-      (defs, c @ [ FST ])
-  | Snd e ->
-      let defs, c = comp e in
-      (defs, c @ [ SND ])
-  | Inl e ->
-      let defs, c = comp e in
-      (defs, c @ [ MK_INL ])
-  | Inr e ->
-      let defs, c = comp e in
-      (defs, c @ [ MK_INR ])
-  | Case (e1, (x1, e2), (x2, e3)) ->
-      let inr_label = new_label () in
-      let after_inr_label = new_label () in
-      let defs1, c1 = comp e1 in
-      let defs2, c2 = comp e2 in
-      let defs3, c3 = comp e3 in
-      ( defs1 @ defs2 @ defs3,
-        c1
-        @ [ CASE (inr_label, None) ]
-        @ ((BIND x1 :: c2) @ [ SWAP; POP ])
-        @ [ GOTO (after_inr_label, None); LABEL inr_label ]
-        @ ((BIND x2 :: c3) @ [ SWAP; POP ])
-        @ [ LABEL after_inr_label ] )
-  | If (e1, e2, e3) ->
-      let else_label = new_label () in
-      let after_else_label = new_label () in
-      let defs1, c1 = comp e1 in
-      let defs2, c2 = comp e2 in
-      let defs3, c3 = comp e3 in
-      ( defs1 @ defs2 @ defs3,
-        c1
-        @ [ TEST (else_label, None) ]
-        @ c2
-        @ [ GOTO (after_else_label, None); LABEL else_label ]
-        @ c3 @ [ LABEL after_else_label ] )
-  | Seq [] -> ([], [])
-  | Seq [ e ] -> comp e
-  | Seq (e :: rest) ->
-      let defs1, c1 = comp e in
-      let defs2, c2 = comp (Seq rest) in
-      (defs1 @ defs2, c1 @ [ POP ] @ c2)
-  | Ref e ->
-      let defs, c = comp e in
-      (defs, c @ [ MK_REF ])
-  | Deref e ->
-      let defs, c = comp e in
-      (defs, c @ [ DEREF ])
-  | While (e1, e2) ->
-      let test_label = new_label () in
-      let end_label = new_label () in
-      let defs1, c1 = comp e1 in
-      let defs2, c2 = comp e2 in
-      ( defs1 @ defs2,
-        [ LABEL test_label ] @ c1
-        @ [ TEST (end_label, None) ]
-        @ c2
-        @ [ POP; GOTO (test_label, None); LABEL end_label; PUSH `Unit ] )
-  | Assign (e1, e2) ->
-      let defs1, c1 = comp e1 in
-      let defs2, c2 = comp e2 in
-      (defs1 @ defs2, c1 @ c2 @ [ ASSIGN ])
-  | App (e1, e2) ->
-      let defs1, c1 = comp e1 in
-      let defs2, c2 = comp e2 in
-      (defs1 @ defs2, c2 @ c1 @ [ APPLY ])
-  | Lambda (x, e) ->
-      let defs, c = comp e in
-      let f = new_label () in
-      let def = [ LABEL f; BIND x ] @ c @ [ SWAP; POP; RETURN ] in
-      (def @ defs, [ MK_CLOSURE (f, None) ])
-  (*
+  let rec comp : Ast.t -> instruction list * instruction list = function
+    | Unit -> ([], [ PUSH Unit ])
+    | Integer n -> ([], [ PUSH (Int n) ])
+    | Boolean b -> ([], [ PUSH (Bool b) ])
+    | Var x -> ([], [ LOOKUP x ])
+    | UnaryOp (op, e) ->
+        let defs, c = comp e in
+        (defs, c @ [ UNARY op ])
+    | BinaryOp (e1, op, e2) ->
+        let defs1, c1 = comp e1 in
+        let defs2, c2 = comp e2 in
+        (defs1 @ defs2, c1 @ c2 @ [ OPER op ])
+    | Pair (e1, e2) ->
+        let defs1, c1 = comp e1 in
+        let defs2, c2 = comp e2 in
+        (defs1 @ defs2, c1 @ c2 @ [ MK_PAIR ])
+    | Fst e ->
+        let defs, c = comp e in
+        (defs, c @ [ FST ])
+    | Snd e ->
+        let defs, c = comp e in
+        (defs, c @ [ SND ])
+    | Inl e ->
+        let defs, c = comp e in
+        (defs, c @ [ MK_INL ])
+    | Inr e ->
+        let defs, c = comp e in
+        (defs, c @ [ MK_INR ])
+    | Case (e1, (x1, e2), (x2, e3)) ->
+        let inr_label = new_label () in
+        let after_inr_label = new_label () in
+        let defs1, c1 = comp e1 in
+        let defs2, c2 = comp e2 in
+        let defs3, c3 = comp e3 in
+        ( defs1 @ defs2 @ defs3,
+          c1
+          @ [ CASE (inr_label, None) ]
+          @ ((BIND x1 :: c2) @ [ SWAP; POP ])
+          @ [ GOTO (after_inr_label, None); LABEL inr_label ]
+          @ ((BIND x2 :: c3) @ [ SWAP; POP ])
+          @ [ LABEL after_inr_label ] )
+    | If (e1, e2, e3) ->
+        let else_label = new_label () in
+        let after_else_label = new_label () in
+        let defs1, c1 = comp e1 in
+        let defs2, c2 = comp e2 in
+        let defs3, c3 = comp e3 in
+        ( defs1 @ defs2 @ defs3,
+          c1
+          @ [ TEST (else_label, None) ]
+          @ c2
+          @ [ GOTO (after_else_label, None); LABEL else_label ]
+          @ c3 @ [ LABEL after_else_label ] )
+    | Seq [] -> ([], [])
+    | Seq [ e ] -> comp e
+    | Seq (e :: rest) ->
+        let defs1, c1 = comp e in
+        let defs2, c2 = comp (Seq rest) in
+        (defs1 @ defs2, c1 @ [ POP ] @ c2)
+    | Ref e ->
+        let defs, c = comp e in
+        (defs, c @ [ MK_REF ])
+    | Deref e ->
+        let defs, c = comp e in
+        (defs, c @ [ DEREF ])
+    | While (e1, e2) ->
+        let test_label = new_label () in
+        let end_label = new_label () in
+        let defs1, c1 = comp e1 in
+        let defs2, c2 = comp e2 in
+        ( defs1 @ defs2,
+          [ LABEL test_label ] @ c1
+          @ [ TEST (end_label, None) ]
+          @ c2
+          @ [ POP; GOTO (test_label, None); LABEL end_label; PUSH Unit ] )
+    | Assign (e1, e2) ->
+        let defs1, c1 = comp e1 in
+        let defs2, c2 = comp e2 in
+        (defs1 @ defs2, c1 @ c2 @ [ ASSIGN ])
+    | App (e1, e2) ->
+        let defs1, c1 = comp e1 in
+        let defs2, c2 = comp e2 in
+        (defs1 @ defs2, c2 @ c1 @ [ APPLY ])
+    | Lambda (x, e) ->
+        let defs, c = comp e in
+        let f = new_label () in
+        let def = [ LABEL f; BIND x ] @ c @ [ SWAP; POP; RETURN ] in
+        (def @ defs, [ MK_CLOSURE (f, None) ])
+    (*
  Note that we could have
 
  | LetFun(f, (x, e1), e2) -> comp (App(Lambda(f, e2), Lambda(x, e1)))
@@ -355,62 +370,43 @@ let rec comp : Ast.t -> code * code = function
   which is simpler.
 
 *)
-  | LetFun (f, (x, e1), e2) ->
-      let defs1, c1 = comp e1 in
-      let defs2, c2 = comp e2 in
-      let lab = new_label () in
-      let def = [ LABEL lab; BIND x ] @ c1 @ [ SWAP; POP; RETURN ] in
-      ( def @ defs1 @ defs2,
-        [ MK_CLOSURE (lab, None); BIND f ] @ c2 @ [ SWAP; POP ] )
-  | LetRecFun (f, (x, e1), e2) ->
-      let defs1, c1 = comp e1 in
-      let defs2, c2 = comp e2 in
-      let lab = new_label () in
-      let def = [ LABEL lab; BIND x ] @ c1 @ [ SWAP; POP; RETURN ] in
-      ( def @ defs1 @ defs2,
-        [ MK_REC (f, (lab, None)); BIND f ] @ c2 @ [ SWAP; POP ] )
-
-let compile e =
+    | LetFun (f, (x, e1), e2) ->
+        let defs1, c1 = comp e1 in
+        let defs2, c2 = comp e2 in
+        let lab = new_label () in
+        let def = [ LABEL lab; BIND x ] @ c1 @ [ SWAP; POP; RETURN ] in
+        ( def @ defs1 @ defs2,
+          [ MK_CLOSURE (lab, None); BIND f ] @ c2 @ [ SWAP; POP ] )
+    | LetRecFun (f, (x, e1), e2) ->
+        let defs1, c1 = comp e1 in
+        let defs2, c2 = comp e2 in
+        let lab = new_label () in
+        let def = [ LABEL lab; BIND x ] @ c1 @ [ SWAP; POP; RETURN ] in
+        ( def @ defs1 @ defs2,
+          [ MK_REC (f, (lab, None)); BIND f ] @ c2 @ [ SWAP; POP ] )
+  in
   let defs, c = comp e in
   (* The HALT instruction needs an annotation to satisfy the types
      We arbitarily use the annotation from the root of the AST
    *)
   let result =
-    c (* body of program *) @ [ HALT ] (* stop the interpreter *) @ defs
+    (* body of program @ stop the interpreter @ function definitions *)
+    c @ (HALT :: defs)
   in
   (* the function definitions *)
-  let () =
-    if Option.verbose then
-      Format.printf "@\nCompiled Code = @\n%a" pp_code result
-  in
-  result
-
-let rec driver n ((cp, evs) as state) =
   if Option.verbose then
-    Format.printf "\nstate %d:%a\n" n pp_state state;
-  match (get_instruction cp, evs) with
-  | HALT, [ V v ] -> v
-  | HALT, _ ->
-      Errors.complainf "driver : bad halted state = %a\n" pp_state state
-  | _ -> driver (n + 1) (step state)
+    Format.printf "Compiled Code = %a@." pp_code result;
+  result
 
 (* put code listing into an array, associate an array index to each label *)
 let load l =
-  let rec find lab = function
-    | [] -> Errors.complainf "find : %s is not found" lab
-    | (x, v) :: rest ->
-        if x = lab then
-          v
-        else
-          find lab rest
-    (* insert array index for each label *)
-  in
+  (* insert array index for each label *)
   let apply_label_map_to_instruction m = function
-    | GOTO (lab, _) -> GOTO (lab, Some (find lab m))
-    | TEST (lab, _) -> TEST (lab, Some (find lab m))
-    | CASE (lab, _) -> CASE (lab, Some (find lab m))
-    | MK_CLOSURE (lab, _) -> MK_CLOSURE (lab, Some (find lab m))
-    | MK_REC (f, (lab, _)) -> MK_REC (f, (lab, Some (find lab m)))
+    | GOTO (lab, _) -> GOTO (lab, Some (List.assoc lab m))
+    | TEST (lab, _) -> TEST (lab, Some (List.assoc lab m))
+    | CASE (lab, _) -> CASE (lab, Some (List.assoc lab m))
+    | MK_CLOSURE (lab, _) -> MK_CLOSURE (lab, Some (List.assoc lab m))
+    | MK_REC (f, (lab, _)) -> MK_REC (f, (lab, Some (List.assoc lab m)))
     | inst -> inst
   in
   (* find array index for each label *)
@@ -427,13 +423,19 @@ let load l =
 
 let interpret (e : Ast.t) : value =
   let c = compile e in
-  installed := load c;
   if Option.verbose then
-    Format.printf "\nInstalled Code = \n%s" (string_of_installed_code ());
-  (* set the code pointer to 0 *)
-  driver 1 (0, [])
+    Format.printf "Compiled code = %a@." pp_code c;
 
-let reset () =
-  next_address := 0;
-  label_ref := 0;
-  Array.fill heap 0 (Array.length heap) (`Int 0)
+  let c = load c in
+
+  let rec driver (n : int) (code : instruction array) (state : state) : value =
+    if Option.verbose then
+      Format.printf "State %d: %a@." n (pp_state code) state;
+    match (code.(state.cp), state.stack) with
+    | HALT, [ V v ] -> v
+    | HALT, _ ->
+        Errors.complainf "driver : bad halted state = %a\n" (pp_state code)
+          state
+    | _ -> driver (n + 1) code (step code state)
+  in
+  driver 0 c init_state

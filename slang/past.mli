@@ -49,5 +49,5 @@ and expr =
 
 and lambda = var * Type.t * t
 
-val to_string : t -> string
 val pp : Format.formatter -> t -> unit
+val pp_nice : Format.formatter -> t -> unit

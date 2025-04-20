@@ -188,7 +188,7 @@ let emit_x86 e =
          need to multiply by 8 (number of bytes in 64-bit word *)
     let j = string_of_int (8 * i) in
     cmd
-      ("movq " ^ j ^ "(%rbp)" ^ ",%r10")
+      ("movq " ^ j ^ "(%rbp),%r10")
       "BEGIN stack lookup, index off of base pointer";
     cmd "pushq %r10" "END stack lookup, push value \n"
   in
@@ -196,7 +196,7 @@ let emit_x86 e =
     let j = string_of_int (8 * i) in
     cmd "movq 8(%rbp), %rax" "BEGIN heap lookup, copy closure pointer to %rax";
     cmd
-      ("movq " ^ j ^ "(%rax)" ^ ",%r10")
+      ("movq " ^ j ^ "(%rax),%r10")
       ("put closue value at index " ^ string_of_int i ^ " in scratch register");
     cmd "pushq %r10" "END heap lookup, push value \n"
   in

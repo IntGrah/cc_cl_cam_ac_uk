@@ -3,11 +3,7 @@ type var = string
 module Unary_op : sig
   type t = Neg | Not | Read
 
-  val to_fun :
-    t ->
-    [> `Bool of bool | `Int of int | `Unit ] ->
-    [> `Bool of bool | `Int of int ]
-
+  val to_fun : t -> 'a Value.t -> 'a Value.t
   val to_string : t -> var
   val pp : Format.formatter -> t -> unit
 end
@@ -15,11 +11,7 @@ end
 module Binary_op : sig
   type t = Add | Sub | Mul | Div | Lt | And | Or | Eqi | Eqb
 
-  val to_fun :
-    t ->
-    [> `Bool of bool | `Int of int ] * [> `Bool of bool | `Int of int ] ->
-    [> `Bool of bool | `Int of int ]
-
+  val to_fun : t -> 'a Value.t * 'a Value.t -> 'a Value.t
   val to_string : t -> var
   val pp : Format.formatter -> t -> unit
 end
@@ -50,5 +42,5 @@ type t =
 
 and lambda = var * t
 
-val to_string : t -> string
 val pp : Format.formatter -> t -> unit
+val pp_nice : Format.formatter -> t -> unit

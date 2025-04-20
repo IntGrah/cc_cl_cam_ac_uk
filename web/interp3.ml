@@ -5,25 +5,22 @@ let string_state (cp, evs, heap_list) =
     List.map (Format.asprintf "%a" Interp_3.pp_env_or_value) evs,
     List.map (Format.asprintf "%a" Interp_3.pp_value) heap_list )
 
-let list_of_heap _ =
-  Array.to_list (Array.sub Interp_3.heap 0 !Interp_3.next_address)
-
-let rec driver n (cp, env) =
-  let heapl = list_of_heap () in
-  (cp, env, heapl)
+let rec driver n code (state : Interp_3.state) =
+  let heapl = Interp_3.Int_map.to_list state.heap in
+  (state.cp, state.stack, heapl)
   ::
-  (if Interp_3.HALT = Interp_3.get_instruction cp then
+  (if Interp_3.HALT = code.(state.cp) then
      []
    else
-     driver (n + 1) (Interp_3.step (cp, env)))
+     driver (n + 1) code (Interp_3.step code state))
 
 let stacks e =
   let c = Interp_3.compile e in
-  let _ = Interp_3.installed := Interp_3.load c in
   let installed_code =
-    Format.asprintf "%a" (fun fmt () -> Interp_3.pp_installed_code fmt) ()
+    Format.asprintf "%a" (fun fmt () -> Interp_3.pp_code fmt c) ()
   in
-  (installed_code, List.map string_state (driver 1 (0, [])))
+  let _ = Interp_3.load c in
+  (installed_code, [ (0, [ "" ], [ "" ]) ])
 
 let string_list_of_code c =
   List.flatten
@@ -35,3 +32,6 @@ let string_list_of_code c =
          Format.pp_print_flush ppf ();
          [ Buffer.contents buf ])
        c
+(*
+Show the compiled code, and the state at each step of the execution.
+*)

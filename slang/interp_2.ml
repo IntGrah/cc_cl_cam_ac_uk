@@ -135,9 +135,6 @@ let pp_interp_state fmt (c, evs, s) =
   Format.fprintf fmt "@\nCode Stack = @\n%a@\nEnv/Value Stack = @\n%a%a" pp_code
     c pp_env_value_stack evs pp_state s
 
-let string_of_env_or_value = Format.asprintf "%a" pp_env_or_value
-let string_of_code = Format.asprintf "%a" pp_code
-
 (* The "MACHINE" *)
 
 (** allocate a new location in the heap and give it value v *)
@@ -154,8 +151,10 @@ let assign (heap, i) a v =
   let heap = IntMap.add a v heap in
   (heap, i)
 
-let mk_fun (c, env) = `Fun (Closure (c, env))
-let mk_rec (f, c, env) = `Fun (Closure (c, (f, `Fun (Rec_closure c)) :: env))
+let mk_fun (c, env) : value = Fun (Closure (c, env))
+
+let mk_rec (f, c, env) : value =
+  Fun (Closure (c, (f, Fun (Rec_closure c)) :: env))
 
 (*
    in interp_0:
@@ -171,19 +170,19 @@ let mk_rec (f, c, env) = `Fun (Closure (c, (f, `Fun (Rec_closure c)) :: env))
       lookup (env1 @ [(f, cl1)] @ evn2, f) =
         CLOSURE (false, (x, body, (f, cl2) :: env2))
 *)
-let rec lookup_opt = function
-  | [], _ -> None
-  | (y, `Fun (Rec_closure body)) :: rest, x when x = y ->
+let rec lookup_opt x : env -> value option = function
+  | [] -> None
+  | (y, Fun (Rec_closure body)) :: rest when x = y ->
       Some (mk_rec (x, body, rest))
-  | (y, v) :: _, x when x = y -> Some v
-  | (_, _) :: rest, x -> lookup_opt (rest, x)
+  | (y, v) :: _ when x = y -> Some v
+  | _ :: rest -> lookup_opt x rest
 
-let rec search (evs, x) =
+let rec search x evs : value =
   match evs with
   | [] -> Errors.complainf "%s is not defined!\n" x
-  | V _ :: rest -> search (rest, x)
+  | V _ :: rest -> search x rest
   | EV env :: rest -> (
-      match lookup_opt (env, x) with None -> search (rest, x) | Some v -> v)
+      match lookup_opt x env with None -> search x rest | Some v -> v)
 
 let rec evs_to_env = function
   | [] -> []
@@ -198,32 +197,31 @@ let step : interp_state -> interp_state = function
   | POP :: ds, _ :: evs, s -> (ds, evs, s)
   | SWAP :: ds, e1 :: e2 :: evs, s -> (ds, e2 :: e1 :: evs, s)
   | BIND x :: ds, V v :: evs, s -> (ds, EV [ (x, v) ] :: evs, s)
-  | LOOKUP x :: ds, evs, s -> (ds, V (search (evs, x)) :: evs, s)
+  | LOOKUP x :: ds, evs, s -> (ds, V (search x evs) :: evs, s)
   | UNARY op :: ds, V v :: evs, s -> (ds, V (Ast.Unary_op.to_fun op v) :: evs, s)
   | OPER op :: ds, V v2 :: V v1 :: evs, s ->
       (ds, V (Ast.Binary_op.to_fun op (v1, v2)) :: evs, s)
-  | MK_PAIR :: ds, V v2 :: V v1 :: evs, s -> (ds, V (`Pair (v1, v2)) :: evs, s)
-  | FST :: ds, V (`Pair (v, _)) :: evs, s -> (ds, V v :: evs, s)
-  | SND :: ds, V (`Pair (_, v)) :: evs, s -> (ds, V v :: evs, s)
-  | MK_INL :: ds, V v :: evs, s -> (ds, V (`Inl v) :: evs, s)
-  | MK_INR :: ds, V v :: evs, s -> (ds, V (`Inr v) :: evs, s)
-  | CASE (c1, _) :: ds, V (`Inl v) :: evs, s -> (c1 @ ds, V v :: evs, s)
-  | CASE (_, c2) :: ds, V (`Inr v) :: evs, s -> (c2 @ ds, V v :: evs, s)
-  | TEST (c1, _) :: ds, V (`Bool true) :: evs, s -> (c1 @ ds, evs, s)
-  | TEST (_, c2) :: ds, V (`Bool false) :: evs, s -> (c2 @ ds, evs, s)
-  | ASSIGN :: ds, V v :: V (`Ref a) :: evs, s ->
-      (ds, V `Unit :: evs, assign s a v)
-  | DEREF :: ds, V (`Ref a) :: evs, s -> (ds, V (deref s a) :: evs, s)
+  | MK_PAIR :: ds, V v2 :: V v1 :: evs, s -> (ds, V (Pair (v1, v2)) :: evs, s)
+  | FST :: ds, V (Pair (v, _)) :: evs, s -> (ds, V v :: evs, s)
+  | SND :: ds, V (Pair (_, v)) :: evs, s -> (ds, V v :: evs, s)
+  | MK_INL :: ds, V v :: evs, s -> (ds, V (Inl v) :: evs, s)
+  | MK_INR :: ds, V v :: evs, s -> (ds, V (Inr v) :: evs, s)
+  | CASE (c1, _) :: ds, V (Inl v) :: evs, s -> (c1 @ ds, V v :: evs, s)
+  | CASE (_, c2) :: ds, V (Inr v) :: evs, s -> (c2 @ ds, V v :: evs, s)
+  | TEST (c1, _) :: ds, V (Bool true) :: evs, s -> (c1 @ ds, evs, s)
+  | TEST (_, c2) :: ds, V (Bool false) :: evs, s -> (c2 @ ds, evs, s)
+  | ASSIGN :: ds, V v :: V (Ref a) :: evs, s -> (ds, V Unit :: evs, assign s a v)
+  | DEREF :: ds, V (Ref a) :: evs, s -> (ds, V (deref s a) :: evs, s)
   | MK_REF :: ds, V v :: evs, s ->
       let a, s' = allocate s v in
-      (ds, V (`Ref a) :: evs, s')
-  | WHILE (_, _) :: ds, V (`Bool false) :: evs, s -> (ds, V `Unit :: evs, s)
-  | WHILE (c1, c2) :: ds, V (`Bool true) :: evs, s ->
+      (ds, V (Ref a) :: evs, s')
+  | WHILE (_, _) :: ds, V (Bool false) :: evs, s -> (ds, V Unit :: evs, s)
+  | WHILE (c1, c2) :: ds, V (Bool true) :: evs, s ->
       (c2 @ [ POP ] @ c1 @ [ WHILE (c1, c2) ] @ ds, evs, s)
   | MK_CLOSURE c :: ds, evs, s -> (ds, V (mk_fun (c, evs_to_env evs)) :: evs, s)
   | MK_REC (f, c) :: ds, evs, s ->
       (ds, V (mk_rec (f, c, evs_to_env evs)) :: evs, s)
-  | APPLY :: ds, V (`Fun (Closure (c, env))) :: V v :: evs, s ->
+  | APPLY :: ds, V (Fun (Closure (c, env))) :: V v :: evs, s ->
       (c @ ds, V v :: EV env :: evs, s)
   | state -> Errors.complainf "step : bad state = %a\n" pp_interp_state state
 
@@ -242,9 +240,9 @@ let leave_scope = [ SWAP; POP ]
    val compile : Ast.t -> code
 *)
 let rec compile : Ast.t -> code = function
-  | Unit -> [ PUSH `Unit ]
-  | Integer n -> [ PUSH (`Int n) ]
-  | Boolean b -> [ PUSH (`Bool b) ]
+  | Unit -> [ PUSH Unit ]
+  | Integer n -> [ PUSH (Int n) ]
+  | Boolean b -> [ PUSH (Bool b) ]
   | Var x -> [ LOOKUP x ]
   | UnaryOp (op, e) -> compile e @ [ UNARY op ]
   | BinaryOp (e1, op, e2) -> compile e1 @ compile e2 @ [ OPER op ]

@@ -57,7 +57,7 @@ let i4x86 (_, e) =
 
 (* show compiled code *)
 let i2cc (_, e) =
-  let () = print_endline (Interp_2.string_of_code (Interp_2.compile e)) in
+  let () = Format.printf "%a" Interp_2.pp_code (Interp_2.compile e) in
   None
 
 let i3cc (_, e) =

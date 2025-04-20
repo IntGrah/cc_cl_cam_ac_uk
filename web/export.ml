@@ -32,7 +32,6 @@ let _ =
 
        method interp3 str =
          wrap_yojson_string (fun _ ->
-             Interp_3.reset ();
              [%to_yojson: string * (int * string list * string list) list]
                (Interp3.stacks (frontend str)))
 
@@ -54,7 +53,6 @@ let _ =
          Js.string
            (wrap
               (fun x ->
-                Interp_3.reset ();
                 yojson_of_instructions
                 @@ Interp3.string_list_of_code (Interp_3.compile (frontend x)))
               str)

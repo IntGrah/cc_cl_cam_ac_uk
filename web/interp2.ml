@@ -15,7 +15,8 @@ let steps e =
 let string_list_of_code code =
   List.map (Format.asprintf "%a" Interp_2.pp_instruction) code
 
-let string_list_of_env env = List.map Interp_2.string_of_env_or_value env
+let string_list_of_env env =
+  List.map (Format.asprintf "%a" Interp_2.pp_env_or_value) env
 
 let list_of_map m =
   List.of_seq @@ Seq.map (fun (_, v) -> v) @@ Interp_2.IntMap.to_seq m

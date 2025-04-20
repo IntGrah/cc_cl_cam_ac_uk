@@ -106,11 +106,11 @@ exprlist:
 
 
 texpr:
-| BOOL                               { `Bool  }
-| INTTYPE                            { `Int  }
-| UNITTYPE                           { `Unit  }
-| texpr ARROW texpr                  { `Arrow ($1, $3)}
-| texpr MUL texpr                    { `Product ($1, $3)}
-| texpr ADD texpr                    { `Sum ($1, $3)}
-| texpr REF                          { `Ref $1 }
+| BOOL                               { Bool  }
+| INTTYPE                            { Int  }
+| UNITTYPE                           { Unit  }
+| texpr ARROW texpr                  { Arrow ($1, $3)}
+| texpr MUL texpr                    { Product ($1, $3)}
+| texpr ADD texpr                    { Sum ($1, $3)}
+| texpr REF                          { Ref $1 }
 | LPAREN texpr RPAREN                { $2 }

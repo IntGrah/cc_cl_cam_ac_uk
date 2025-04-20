@@ -48,5 +48,5 @@ val compile : Ast.t -> code
 val interpret : Ast.t -> value
 val pp_instruction : Format.formatter -> instruction -> unit
 val pp_value : Format.formatter -> value -> unit
-val string_of_env_or_value : env_or_value -> string
-val string_of_code : code -> string
+val pp_env_or_value : Format.formatter -> env_or_value -> unit
+val pp_code : Format.formatter -> code -> unit

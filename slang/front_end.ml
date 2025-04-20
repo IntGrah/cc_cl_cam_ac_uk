@@ -1,12 +1,3 @@
-let print_if_verbose m pp e =
-  if Option.verbose_front then (
-    print_endline m;
-    print_endline
-      (if Option.verbose_tree then
-         Pptree.pp_no_bracket (pp e)
-       else
-         pp e))
-
 let parse_error filename (lexbuf : Lexing.lexbuf) =
   let pos = lexbuf.lex_curr_p in
   let line = string_of_int pos.pos_lnum in
@@ -20,7 +11,11 @@ let parse file lexbuf =
     try Parser.start Lexer.token lexbuf
     with Parsing.Parse_error -> parse_error file lexbuf
   in
-  print_if_verbose "Parsed result:" Past.to_string e;
+  if Option.verbose_front then
+    if Option.verbose_tree then
+      Format.printf "Parsed result:@.%a" Past.pp_nice e
+    else
+      Format.printf "Parsed result:@.%a" Past.pp e;
   e
 
 (* Perform static checks and translate from Past to Ast *)
@@ -31,7 +26,12 @@ let check filename e =
       Errors.complainf "ERROR in %s with %s : %s@." filename "type check"
         "type error"
   in
-  print_if_verbose "After static checks:" Ast.to_string e';
+  if Option.verbose_front then
+    if Option.verbose_tree then
+      Format.printf "After static checks: %a" Ast.pp_nice e'
+    else
+      Format.printf "After static checks: %a" Ast.pp e';
+
   e'
 
 (* The front end *)

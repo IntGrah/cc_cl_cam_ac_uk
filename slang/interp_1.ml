@@ -46,7 +46,7 @@ and pp_fun fmt = function
   | Rec_closure clo -> Format.fprintf fmt "Rec_closure(%a)" pp_closure clo
 
 and pp_closure fmt (var, e, env) =
-  Format.fprintf fmt "%s, %s, %a" var (Ast.to_string e) pp_env env
+  Format.fprintf fmt "%s, %a, %a" var Ast.pp e pp_env env
 
 and pp_env fmt env =
   Format.fprintf fmt "[%a]"
@@ -66,28 +66,27 @@ let update (x, v) env = (x, v) :: env
 (** When making a closure, only include bindings that are needed. *)
 let filter_env fvars = List.filter (fun (x, _) -> List.mem x fvars)
 
-let mk_fun (x, body, env) =
+let mk_fun (x, body, env) : value =
   let fvars = Free_vars.free_vars [ x ] body in
   let smaller_env = filter_env fvars env in
-  `Fun (Closure (x, body, smaller_env))
+  Fun (Closure (x, body, smaller_env))
 
-let mk_rec_fun (f, x, body, env) =
+let mk_rec_fun (f, x, body, env) : value =
   let fvars = Free_vars.free_vars [ f; x ] body in
   let smaller_env = filter_env fvars env in
-  let f_binding = (f, `Fun (Rec_closure (x, body, []))) in
-  `Fun (Closure (x, body, f_binding :: smaller_env))
+  Fun (Closure (x, body, (f, Fun (Rec_closure (x, body, []))) :: smaller_env))
 
 (** for a recursive function [f] we want
     [lookup (env, f) = FUN(true, (x, body, env))] *)
-let lookup (env, x) =
-  let rec aux = function
+let lookup x env : value =
+  let rec aux : env -> value = function
     | [] -> Errors.complainf "%s is not defined!" x
     | (y, v) :: rest ->
         if x = y then
           match v with
-          | `Fun (Rec_closure (z, body, _)) ->
-              `Fun
-                (Closure (z, body, (y, `Fun (Rec_closure (z, body, []))) :: rest))
+          | Fun (Rec_closure (z, body, _)) ->
+              Fun
+                (Closure (z, body, (y, Fun (Rec_closure (z, body, []))) :: rest))
           | _ -> v
         else
           aux rest
@@ -105,29 +104,26 @@ let pp_continuation_action fmt = function
   | MKINL -> Format.fprintf fmt "MKINL"
   | MKINR -> Format.fprintf fmt "MKINR"
   | APPLY v -> Format.fprintf fmt "APPLY %a" pp_value v
-  | ARG (e, env) ->
-      Format.fprintf fmt "ARG(%s, %a)" (Ast.to_string e) pp_env env
+  | ARG (e, env) -> Format.fprintf fmt "ARG(%a, %a)" Ast.pp e pp_env env
   | OPER (op, v) ->
       Format.fprintf fmt "OPER(%s, %a)" (Ast.Binary_op.to_string op) pp_value v
   | CASE (x1, e1, x2, e2, env) ->
-      Format.fprintf fmt "CASE(%s, %s, %s, %s, %a)" x1 (Ast.to_string e1) x2
-        (Ast.to_string e2) pp_env env
+      Format.fprintf fmt "CASE(%s, %a, %s, %a, %a)" x1 Ast.pp e1 x2 Ast.pp e2
+        pp_env env
   | PAIR_FST (e, env) ->
-      Format.fprintf fmt "PAIR_FST(%s, %a)" (Ast.to_string e) pp_env env
+      Format.fprintf fmt "PAIR_FST(%a, %a)" Ast.pp e pp_env env
   | OPER_FST (e, env, op) ->
-      Format.fprintf fmt "OPER_FST(%s, %a, %s)" (Ast.to_string e) pp_env env
+      Format.fprintf fmt "OPER_FST(%a, %a, %s)" Ast.pp e pp_env env
         (Ast.Binary_op.to_string op)
   | IF (e1, e2, env) ->
-      Format.fprintf fmt "IF(%s, %s, %a)" (Ast.to_string e1) (Ast.to_string e2)
-        pp_env env
+      Format.fprintf fmt "IF(%a, %a, %a)" Ast.pp e1 Ast.pp e2 pp_env env
   | ASSIGN v -> Format.fprintf fmt "ASSIGN %a" pp_value v
   | ASSIGN_FST (e, env) ->
-      Format.fprintf fmt "ASSIGN_FST(%s, %a)" (Ast.to_string e) pp_env env
+      Format.fprintf fmt "ASSIGN_FST(%a, %a)" Ast.pp e pp_env env
   | TAIL (el, env) ->
       Format.fprintf fmt "TAIL(%a, %a)" pp_expr_list el pp_env env
   | WHILE (e1, e2, env) ->
-      Format.fprintf fmt "WHILE(%s, %s, %a)" (Ast.to_string e1)
-        (Ast.to_string e2) pp_env env
+      Format.fprintf fmt "WHILE(%a, %a, %a)" Ast.pp e1 Ast.pp e2 pp_env env
   | MKREF -> Format.fprintf fmt "MKREF"
   | DEREF -> Format.fprintf fmt "DEREF"
 
@@ -138,12 +134,12 @@ let pp_continuation =
 
 let pp_state fmt = function
   | INSPECT (e, env, cnt) ->
-      Format.fprintf fmt "INSPECT(%s, %a, %a)" (Ast.to_string e) pp_env env
+      Format.fprintf fmt "INSPECT(%a, %a, %a)" Ast.pp e pp_env env
         pp_continuation cnt
   | COMPUTE (cnt, v) ->
       Format.fprintf fmt "COMPUTE(%a, %a)" pp_continuation cnt pp_value v
 
-let heap = Array.make Option.heap_max (`Int 0)
+let heap = Array.make Option.heap_max (Value.Int 0)
 
 let new_address =
   let next_address = ref 0 in
@@ -152,10 +148,10 @@ let new_address =
     next_address := a + 1;
     a
 
-let mk_ref v =
+let mk_ref v : value =
   let a = new_address () in
   heap.(a) <- v;
-  `Ref a
+  Ref a
 
 let do_assign a v = heap.(a) <- v
 
@@ -186,43 +182,43 @@ let step = function
   | INSPECT (While (e1, e2), env, k) ->
       INSPECT (e1, env, WHILE (e1, e2, env) :: k)
   (* INSPECT --> COMPUTE *)
-  | INSPECT (Unit, _, k) -> COMPUTE (k, `Unit)
-  | INSPECT (Var x, env, k) -> COMPUTE (k, lookup (env, x))
-  | INSPECT (Integer n, _, k) -> COMPUTE (k, `Int n)
-  | INSPECT (Boolean b, _, k) -> COMPUTE (k, `Bool b)
+  | INSPECT (Unit, _, k) -> COMPUTE (k, Unit)
+  | INSPECT (Var x, env, k) -> COMPUTE (k, lookup x env)
+  | INSPECT (Integer n, _, k) -> COMPUTE (k, Int n)
+  | INSPECT (Boolean b, _, k) -> COMPUTE (k, Bool b)
   | INSPECT (Lambda (x, body), env, k) -> COMPUTE (k, mk_fun (x, body, env))
   (* COMPUTE --> COMPUTE *)
   | COMPUTE (UNARY op :: k, v) -> COMPUTE (k, Ast.Unary_op.to_fun op v)
   | COMPUTE (OPER (op, v1) :: k, v2) ->
       COMPUTE (k, Ast.Binary_op.to_fun op (v1, v2))
-  | COMPUTE (MKPAIR v1 :: k, v2) -> COMPUTE (k, `Pair (v1, v2))
-  | COMPUTE (FST :: k, `Pair (v, _)) -> COMPUTE (k, v)
-  | COMPUTE (SND :: k, `Pair (_, v)) -> COMPUTE (k, v)
-  | COMPUTE (MKINL :: k, v) -> COMPUTE (k, `Inl v)
-  | COMPUTE (MKINR :: k, v) -> COMPUTE (k, `Inr v)
+  | COMPUTE (MKPAIR v1 :: k, v2) -> COMPUTE (k, Pair (v1, v2))
+  | COMPUTE (FST :: k, Pair (v, _)) -> COMPUTE (k, v)
+  | COMPUTE (SND :: k, Pair (_, v)) -> COMPUTE (k, v)
+  | COMPUTE (MKINL :: k, v) -> COMPUTE (k, Inl v)
+  | COMPUTE (MKINR :: k, v) -> COMPUTE (k, Inr v)
   | COMPUTE (MKREF :: k, v) -> COMPUTE (k, mk_ref v)
-  | COMPUTE (DEREF :: k, `Ref a) -> COMPUTE (k, heap.(a))
-  | COMPUTE (ASSIGN (`Ref a) :: k, v) ->
+  | COMPUTE (DEREF :: k, Ref a) -> COMPUTE (k, heap.(a))
+  | COMPUTE (ASSIGN (Ref a) :: k, v) ->
       let _ = do_assign a v in
-      COMPUTE (k, `Unit)
-  | COMPUTE (WHILE (_, _, _) :: k, `Bool false) -> COMPUTE (k, `Unit)
+      COMPUTE (k, Unit)
+  | COMPUTE (WHILE (_, _, _) :: k, Bool false) -> COMPUTE (k, Unit)
   (* COMPUTE --> INSPECT *)
   | COMPUTE (OPER_FST (e2, env, op) :: k, v1) ->
       INSPECT (e2, env, OPER (op, v1) :: k)
-  | COMPUTE (APPLY v2 :: k, `Fun (Closure (x, body, env))) ->
+  | COMPUTE (APPLY v2 :: k, Fun (Closure (x, body, env))) ->
       INSPECT (body, update (x, v2) env, k)
-  | COMPUTE (APPLY v2 :: k, `Fun (Rec_closure (x, body, env))) ->
+  | COMPUTE (APPLY v2 :: k, Fun (Rec_closure (x, body, env))) ->
       INSPECT (body, update (x, v2) env, k)
   | COMPUTE (ARG (e2, env) :: k, v) -> INSPECT (e2, env, APPLY v :: k)
   | COMPUTE (PAIR_FST (e2, env) :: k, v1) -> INSPECT (e2, env, MKPAIR v1 :: k)
-  | COMPUTE (CASE (x1, e1, _, _, env) :: k, `Inl v) ->
+  | COMPUTE (CASE (x1, e1, _, _, env) :: k, Inl v) ->
       INSPECT (e1, update (x1, v) env, k)
-  | COMPUTE (CASE (_, _, x2, e2, env) :: k, `Inr v) ->
+  | COMPUTE (CASE (_, _, x2, e2, env) :: k, Inr v) ->
       INSPECT (e2, update (x2, v) env, k)
-  | COMPUTE (IF (e2, _, env) :: k, `Bool true) -> INSPECT (e2, env, k)
-  | COMPUTE (IF (_, e3, env) :: k, `Bool false) -> INSPECT (e3, env, k)
+  | COMPUTE (IF (e2, _, env) :: k, Bool true) -> INSPECT (e2, env, k)
+  | COMPUTE (IF (_, e3, env) :: k, Bool false) -> INSPECT (e3, env, k)
   | COMPUTE (ASSIGN_FST (e2, env) :: k, v) -> INSPECT (e2, env, ASSIGN v :: k)
-  | COMPUTE (WHILE (e1, e2, env) :: k, `Bool true) ->
+  | COMPUTE (WHILE (e1, e2, env) :: k, Bool true) ->
       INSPECT (Seq [ e2; e1 ], env, WHILE (e1, e2, env) :: k)
   | COMPUTE (TAIL (el, env) :: k, _) -> INSPECT (Seq el, env, k)
   | state -> Errors.complainf "step : malformed state = %a@." pp_state state
