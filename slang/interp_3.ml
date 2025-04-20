@@ -149,10 +149,6 @@ let pp_env_or_value fmt = function
   | RA i -> Format.fprintf fmt "RA %d" i
 
 let pp_env_value_stack fmt = pp_list fmt ";@\n " pp_env_or_value
-let string_of_value = Format.asprintf "%a" pp_value
-let string_of_location = Format.asprintf "%a" pp_location
-let string_of_code = Format.asprintf "%a" pp_code
-let string_of_env_or_value = Format.asprintf "%a" pp_env_or_value
 
 (* THE MACHINE *)
 
@@ -179,22 +175,20 @@ let new_address () =
   next_address := a + 1;
   a
 
-let string_of_heap () =
-  let rec aux k =
+let pp_heap fmt =
+  let rec aux fmt k =
     if !next_address < k then
-      ""
+      ()
     else
-      string_of_int k ^ " -> " ^ string_of_value heap.(k) ^ "\n" ^ aux (k + 1)
+      Format.fprintf fmt "%d -> %a\n%a" k pp_value heap.(k) aux (k + 1)
   in
-  "\nHeap = \n" ^ aux 0
+  Format.fprintf fmt "\nHeap = \n%a" aux 0
 
 let pp_state fmt (cp, evs) =
-  Format.fprintf fmt "@\nCode Pointer = %d -> %a@\nStack = %a%s@\n" cp
-    pp_instruction (get_instruction cp) pp_env_value_stack evs
-    (if !next_address = 0 then
-       ""
-     else
-       string_of_heap ())
+  Format.fprintf fmt "@\nCode Pointer = %d -> %a@.Stack = %a@." cp
+    pp_instruction (get_instruction cp) pp_env_value_stack evs;
+  if !next_address <> 0 then
+    pp_heap fmt
 
 let step (cp, evs) =
   match (get_instruction cp, evs) with

@@ -45,7 +45,7 @@ let i2 (file, e) =
 
 let i3 (file, e) =
   wrap file e
-    (fun x -> Interp_3.string_of_value (Interp_3.interpret x))
+    (fun x -> Format.asprintf "%a" Interp_3.pp_value (Interp_3.interpret x))
     "Interpreter 3"
 
 let i4 (file, e) =
@@ -61,7 +61,7 @@ let i2cc (_, e) =
   None
 
 let i3cc (_, e) =
-  let () = print_endline (Interp_3.string_of_code (Interp_3.compile e)) in
+  let () = Format.printf "%a" Interp_3.pp_code (Interp_3.compile e) in
   None
 
 let i4cc (_, e) =

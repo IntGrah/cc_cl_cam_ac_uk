@@ -81,7 +81,7 @@ let mk_rec_fun (f, x, body, env) =
     [lookup (env, f) = FUN(true, (x, body, env))] *)
 let lookup (env, x) =
   let rec aux = function
-    | [] -> Errors.complain (x ^ " is not defined!\n")
+    | [] -> Errors.complainf "%s is not defined!" x
     | (y, v) :: rest ->
         if x = y then
           match v with
@@ -94,8 +94,8 @@ let lookup (env, x) =
   in
   aux env
 
-let string_of_list sep f l = "[" ^ String.concat sep (List.map f l) ^ "]"
-let string_of_expr_list = string_of_list "; " Ast.to_string
+let pp_expr_list =
+  Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ";@.") Ast.pp
 
 let pp_continuation_action fmt = function
   | UNARY op -> Format.fprintf fmt "UNARY %s" (Ast.Unary_op.to_string op)
@@ -124,7 +124,7 @@ let pp_continuation_action fmt = function
   | ASSIGN_FST (e, env) ->
       Format.fprintf fmt "ASSIGN_FST(%s, %a)" (Ast.to_string e) pp_env env
   | TAIL (el, env) ->
-      Format.fprintf fmt "TAIL(%s, %a)" (string_of_expr_list el) pp_env env
+      Format.fprintf fmt "TAIL(%a, %a)" pp_expr_list el pp_env env
   | WHILE (e1, e2, env) ->
       Format.fprintf fmt "WHILE(%s, %s, %a)" (Ast.to_string e1)
         (Ast.to_string e2) pp_env env

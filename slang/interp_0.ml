@@ -51,7 +51,6 @@ let new_address =
     a
 
 let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
-  (* State monad would be more concise *)
   match e with
   | Unit -> (`Unit, store)
   | Var x -> (env x, store)
@@ -144,8 +143,8 @@ let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
       in
       interp e new_env store
 
-let empty_env : env = fun x -> Errors.complainf "%s is not defined" x
-let empty_store : store = fun x -> Errors.complainf "%d is not allocated" x
+let empty_env : env = fun var -> Errors.complainf "%s is not defined" var
+let empty_store : store = fun ad -> Errors.complainf "%d is not allocated" ad
 
 let interpret (e : Ast.t) : value =
   let v, _ = interp e empty_env empty_store in

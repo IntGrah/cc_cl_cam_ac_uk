@@ -52,13 +52,9 @@ val driver : int -> state -> value
 val get_instruction : address -> instruction
 val interpret : Ast.t -> value
 val pp_code : Format.formatter -> code -> unit
+val pp_instruction : Format.formatter -> instruction -> unit
 val pp_value : Format.formatter -> value -> unit
 val pp_env_or_value : Format.formatter -> env_or_value -> unit
 val pp_installed_code : Format.formatter -> unit
 val pp_location : Format.formatter -> location -> unit
-val string_of_code : code -> string
-val string_of_value : value -> string
-val string_of_env_or_value : env_or_value -> string
-val string_of_installed_code : unit -> string
-val string_of_location : location -> string
 val reset : unit -> unit

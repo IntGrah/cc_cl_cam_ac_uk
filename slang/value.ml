@@ -10,9 +10,9 @@ type 'f t =
 
 let rec pp pp_fun ppf = function
   | `Ref a -> Format.fprintf ppf "Ref(%d)" a
-  | `Bool b -> Format.pp_print_bool ppf b
-  | `Int n -> Format.pp_print_int ppf n
-  | `Unit -> Format.pp_print_string ppf "Unit"
+  | `Bool b -> Format.fprintf ppf "%b" b
+  | `Int n -> Format.fprintf ppf "%d" n
+  | `Unit -> Format.fprintf ppf "Unit"
   | `Pair (v1, v2) ->
       Format.fprintf ppf "(@[%a,@ %a)@]" (pp pp_fun) v1 (pp pp_fun) v2
   | `Inl v -> Format.fprintf ppf "Inl(%a)" (pp pp_fun) v
