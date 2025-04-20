@@ -7,7 +7,7 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
 
 open Slanglib
 
-(*  This is the main file. *)
+(* This is the main file. *)
 
 let error file action s =
   Format.printf "ERROR in %s with %s : %s\n" file action s
@@ -67,7 +67,7 @@ let i3cc (_, e) =
   None
 
 let i4cc (_, e) =
-  Format.printf "%a" Jargon.pp_listing (Jargon.compile e);
+  Format.printf "%a" Jargon.pp_code (Jargon.compile e);
   None
 
 let interpreters =
@@ -87,8 +87,8 @@ let interpreters =
 let show_output describe string_out =
   if not Option.run_tests then (
     if Option.verbose then
-      print_string ("\n" ^ describe ^ " \n");
-    print_string ("output> " ^ string_out ^ "\n"))
+      Format.printf "%s \n" describe;
+    Format.printf "output> %s\n" string_out)
 
 (* used for -t option *)
 let check_expected describe file string_out = function
@@ -108,8 +108,8 @@ let rec run_interpreters file e expected_option = function
       match interp (file, e) with
       | None -> run_interpreters file e expected_option rest
       | Some string_out ->
-          let () = show_output describe string_out in
-          let () = check_expected describe file string_out expected_option in
+          show_output describe string_out;
+          check_expected describe file string_out expected_option;
           run_interpreters file e expected_option rest)
   | (false, _, _) :: rest -> run_interpreters file e expected_option rest
 

@@ -43,23 +43,23 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
 
 (* First a very simple example *)
 
-(* sum : 'a * 'a * ('a -> int) -> int *)
+(** sum : 'a * 'a * ('a -> int) -> int *)
 let sum (a, b, f) = f a + f b
 
-(* test : int * int -> int *)
+(** test : int * int -> int *)
 let test (x, y) = sum (x, y, fun z -> z * y) * sum (x, y, fun w -> (w * x) + y)
 
-(* after the dfc transformation : *)
+(** after the dfc transformation : *)
 
 type funs = FUN1 of int | FUN2 of int * int
 
-(* apply_funs : funs * int -> int *)
+(** apply_funs : funs * int -> int *)
 let apply_funs = function FUN1 y, z -> z * y | FUN2 (x, y), w -> (w * x) + y
 
-(* sum_dfc :  int * int * funs -> int *)
+(** sum_dfc : int * int * funs -> int *)
 let sum_dfc (a, b, f) = apply_funs (f, a) + apply_funs (f, b)
 
-(* test_dfc : int * int -> int *)
+(** test_dfc : int * int -> int *)
 let test_dfc (x, y) = sum_dfc (x, y, FUN1 y) * sum_dfc (x, y, FUN2 (x, y))
 
 (* Observation.

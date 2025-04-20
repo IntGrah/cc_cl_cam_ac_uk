@@ -88,10 +88,10 @@ let stack_top vm = vm.stack.(vm.sp - 1)
 
 (********************** Printing ********************************)
 
-let rec pp_listing fmt : code -> unit = function
+let rec pp_code fmt : code -> unit = function
   | [] -> Format.fprintf fmt "\n"
-  | LABEL l :: rest -> Format.fprintf fmt "\n%s: %a" l pp_listing rest
-  | i :: rest -> Format.fprintf fmt "\n\t%a%a" pp_instruction i pp_listing rest
+  | LABEL l :: rest -> Format.fprintf fmt "%s: %a@\n" l pp_code rest
+  | i :: rest -> Format.fprintf fmt "\t%a%a@\n" pp_instruction i pp_code rest
 
 let pp_installed_code fmt (code, size) =
   let rec aux fmt k =
@@ -169,7 +169,7 @@ let pp_value fmt vm =
 (***************************** THE MACHINE ********************************)
 
 let readint () =
-  let _ = print_string "input> " in
+  print_string ">>> ";
   read_int ()
 
 let stack_to_heap_item = function
@@ -197,10 +197,10 @@ let advance_cp vm =
   else
     { vm with status = Code_index_out_of_bounds }
 
-let goto (i, vm) = { vm with cp = i }
+let goto i vm = { vm with cp = i }
 
 (* pop n items from stack *)
-let pop (n, vm) =
+let pop n vm =
   if 0 <= vm.sp - n then
     { vm with sp = vm.sp - n }
   else
@@ -208,10 +208,10 @@ let pop (n, vm) =
 
 let pop_top vm =
   let c = stack_top vm in
-  (c, pop (1, vm))
+  (c, pop 1 vm)
 
 (* pop c onto stack  *)
-let push (c, vm) =
+let push c vm =
   if vm.sp < vm.stack_bound then
     let _ = Array.set vm.stack vm.sp c in
     { vm with sp = vm.sp + 1 }
@@ -219,9 +219,9 @@ let push (c, vm) =
     { vm with status = Stack_index_out_of_bounds }
 
 let swap vm =
-  let c1, vm1 = pop_top vm in
-  let c2, vm2 = pop_top vm1 in
-  push (c2, push (c1, vm2))
+  let c1, vm = pop_top vm in
+  let c2, vm = pop_top vm in
+  push c2 (push c1 vm)
 
 let do_unary : Ast.Unary_op.t * stack_item -> stack_item = function
   | Not, STACK_BOOL m -> STACK_BOOL (not m)
@@ -243,14 +243,14 @@ let do_oper : Ast.Binary_op.t * stack_item * stack_item -> stack_item = function
   | op, _, _ ->
       Errors.complainf "do_oper: malformed operator: %a" Ast.Binary_op.pp op
 
-let perform_op (op, vm) =
-  let v_right, vm1 = pop_top vm in
-  let v_left, vm2 = pop_top vm1 in
-  push (do_oper (op, v_left, v_right), vm2)
+let perform_op op vm =
+  let v_right, vm = pop_top vm in
+  let v_left, vm = pop_top vm in
+  push (do_oper (op, v_left, v_right)) vm
 
-let perform_unary (op, vm) =
-  let v, vm1 = pop_top vm in
-  push (do_unary (op, v), vm1)
+let perform_unary op vm =
+  let v, vm = pop_top vm in
+  push (do_unary (op, v)) vm
 
 (* implement garbage collection!
 
@@ -265,7 +265,7 @@ let perform_unary (op, vm) =
 *)
 let invoke_garbage_collection _ = None
 
-let allocate (n, vm) =
+let allocate n vm =
   let hp1 = vm.hp in
   if hp1 + n < vm.heap_bound then
     (hp1, { vm with hp = vm.hp + n })
@@ -279,59 +279,57 @@ let allocate (n, vm) =
           Errors.complain "allocate : heap exhausted"
 
 let mk_pair vm =
-  let v_right, vm1 = pop_top vm in
-  let v_left, vm2 = pop_top vm1 in
-  let a, vm3 = allocate (3, vm2) in
+  let v_right, vm = pop_top vm in
+  let v_left, vm = pop_top vm in
+  let a, vm = allocate 3 vm in
   let header = HEAP_HEADER (3, HT_PAIR) in
   let _ = Array.set vm.heap a header in
   let _ = Array.set vm.heap (a + 1) (stack_to_heap_item v_left) in
   let _ = Array.set vm.heap (a + 2) (stack_to_heap_item v_right) in
-  push (STACK_HI a, vm3)
+  push (STACK_HI a) vm
 
 let do_fst vm =
-  let v, vm1 = pop_top vm in
+  let v, vm = pop_top vm in
   match v with
   | STACK_HI a -> (
-      match vm1.heap.(a) with
-      | HEAP_HEADER (_, HT_PAIR) ->
-          push (heap_to_stack_item vm.heap.(a + 1), vm1)
+      match vm.heap.(a) with
+      | HEAP_HEADER (_, HT_PAIR) -> push (heap_to_stack_item vm.heap.(a + 1)) vm
       | _ -> Errors.complain "do_fst : unexpectd heap item")
   | _ -> Errors.complain "do_fst : expecting heap pointer on stack"
 
 let do_snd vm =
-  let v, vm1 = pop_top vm in
+  let v, vm = pop_top vm in
   match v with
   | STACK_HI a -> (
-      match vm1.heap.(a) with
-      | HEAP_HEADER (_, HT_PAIR) ->
-          push (heap_to_stack_item vm.heap.(a + 2), vm1)
+      match vm.heap.(a) with
+      | HEAP_HEADER (_, HT_PAIR) -> push (heap_to_stack_item vm.heap.(a + 2)) vm
       | _ -> Errors.complain "do_snd : unexpectd heap item")
   | _ -> Errors.complain "do_snd : expecting heap pointer on stack"
 
 let mk_inl vm =
-  let v, vm1 = pop_top vm in
-  let a, vm2 = allocate (2, vm1) in
+  let v, vm = pop_top vm in
+  let a, vm = allocate 2 vm in
   let header = HEAP_HEADER (2, HT_INL) in
-  let _ = Array.set vm2.heap a header in
-  let _ = Array.set vm2.heap (a + 1) (stack_to_heap_item v) in
-  push (STACK_HI a, vm2)
+  let _ = Array.set vm.heap a header in
+  let _ = Array.set vm.heap (a + 1) (stack_to_heap_item v) in
+  push (STACK_HI a) vm
 
 let mk_inr vm =
-  let v, vm1 = pop_top vm in
-  let a, vm2 = allocate (2, vm1) in
+  let v, vm = pop_top vm in
+  let a, vm = allocate 2 vm in
   let header = HEAP_HEADER (2, HT_INR) in
-  let _ = Array.set vm2.heap a header in
-  let _ = Array.set vm2.heap (a + 1) (stack_to_heap_item v) in
-  push (STACK_HI a, vm2)
+  let _ = Array.set vm.heap a header in
+  let _ = Array.set vm.heap (a + 1) (stack_to_heap_item v) in
+  push (STACK_HI a) vm
 
-let case (i, vm) =
-  let c, vm1 = pop_top vm in
+let case i vm =
+  let c, vm = pop_top vm in
   match c with
   | STACK_HI a -> (
-      let vm2 = push (heap_to_stack_item vm.heap.(a + 1), vm1) in
-      match vm1.heap.(a) with
-      | HEAP_HEADER (_, HT_INR) -> goto (i, vm2)
-      | HEAP_HEADER (_, HT_INL) -> advance_cp vm2
+      let vm = push (heap_to_stack_item vm.heap.(a + 1)) vm in
+      match vm.heap.(a) with
+      | HEAP_HEADER (_, HT_INR) -> goto i vm
+      | HEAP_HEADER (_, HT_INL) -> advance_cp vm
       | _ ->
           Errors.complain "case: runtime error, expecting union header in heap")
   | _ ->
@@ -339,33 +337,33 @@ let case (i, vm) =
         "case: runtime error, expecting heap index on top of stack"
 
 let mk_ref vm =
-  let v, vm1 = pop_top vm in
-  let a, vm2 = allocate (1, vm1) in
-  let _ = Array.set vm2.heap a (stack_to_heap_item v) in
-  push (STACK_HI a, vm2)
+  let v, vm = pop_top vm in
+  let a, vm = allocate 1 vm in
+  vm.heap.(a) <- stack_to_heap_item v;
+  push (STACK_HI a) vm
 
 let deref vm =
-  let v, vm1 = pop_top vm in
+  let v, vm = pop_top vm in
   match v with
-  | STACK_HI a -> push (heap_to_stack_item vm1.heap.(a), vm1)
+  | STACK_HI a -> push (heap_to_stack_item vm.heap.(a)) vm
   | _ -> Errors.complain "deref"
 
 let assign vm =
-  let c1, vm1 = pop_top vm in
-  let c2, _ = pop_top vm1 in
+  let c1, vm = pop_top vm in
+  let c2, vm = pop_top vm in
   match c2 with
   | STACK_HI a ->
       if vm.sp < vm.heap_bound then (
         vm.heap.(a) <- stack_to_heap_item c1;
-        push (STACK_UNIT, vm))
+        push STACK_UNIT vm)
       else
         { vm with status = Heap_index_out_of_bounds }
   | _ -> Errors.complain "assign: runtime error, expecting heap index on stack"
 
-let test (i, vm) =
+let test i vm =
   match stack_top vm with
   | STACK_BOOL true -> advance_cp vm
-  | STACK_BOOL false -> goto (i, vm)
+  | STACK_BOOL false -> goto i vm
   | _ -> Errors.complain "test: runtime error, expecting boolean on stack"
 
 let return vm =
@@ -373,7 +371,7 @@ let return vm =
   match (vm.stack.(current_fp), vm.stack.(vm.fp + 1)) with
   | STACK_FP saved_fp, STACK_RA k ->
       let return_value = stack_top vm in
-      push (return_value, { vm with cp = k; fp = saved_fp; sp = current_fp - 2 })
+      push return_value { vm with cp = k; fp = saved_fp; sp = current_fp - 2 }
   | _ -> Errors.complain "return : malformed stack frame"
 
 let fetch fp vm = function
@@ -383,26 +381,26 @@ let fetch fp vm = function
       | STACK_HI a -> heap_to_stack_item vm.heap.(a + offset + 1)
       | _ -> Errors.complain "search : expecting closure pointer")
 
-let lookup fp vm vlp = push (fetch fp vm vlp, vm)
+let lookup fp vm vlp = push (fetch fp vm vlp) vm
 
 let mk_closure = function
   | (_, Some i), n, vm ->
-      let a, vm1 = allocate (2 + n, vm) in
+      let a, vm = allocate (2 + n) vm in
       let header = HEAP_HEADER (2 + n, HT_CLOSURE) in
       let code_address = HEAP_CI i in
-      vm1.heap.(a) <- header;
-      vm1.heap.(a + 1) <- code_address;
+      vm.heap.(a) <- header;
+      vm.heap.(a + 1) <- code_address;
       let rec aux m =
         if m = n then
           ()
         else
-          let v = stack_to_heap_item vm1.stack.(vm.sp - (m + 1)) in
-          vm1.heap.(a + m + 2) <- v;
+          let v = stack_to_heap_item vm.stack.(vm.sp - (m + 1)) in
+          vm.heap.(a + m + 2) <- v;
           aux (m + 1)
       in
       aux 0;
-      let vm2 = pop (n, vm1) in
-      push (STACK_HI a, vm2)
+      let vm = pop n vm in
+      push (STACK_HI a) vm
   | (_, None), _, _ ->
       Errors.complain "mk_closure : internal error, no address in closure!"
 
@@ -414,8 +412,8 @@ let apply vm =
           let new_fp = vm.sp in
           let saved_fp = STACK_FP vm.fp in
           let return_index = STACK_RA (vm.cp + 1) in
-          let new_vm = { vm with cp = i; fp = new_fp } in
-          push (return_index, push (saved_fp, new_vm))
+          let vm = { vm with cp = i; fp = new_fp } in
+          push return_index (push saved_fp vm)
       | _ ->
           Errors.complain "apply: runtime error, expecting code index in heap")
   | _ ->
@@ -424,28 +422,28 @@ let apply vm =
 
 let step vm =
   match vm.code.(vm.cp) with
-  | UNARY op -> advance_cp (perform_unary (op, vm))
-  | OPER op -> advance_cp (perform_op (op, vm))
+  | UNARY op -> advance_cp (perform_unary op vm)
+  | OPER op -> advance_cp (perform_op op vm)
   | MK_PAIR -> advance_cp (mk_pair vm)
   | FST -> advance_cp (do_fst vm)
   | SND -> advance_cp (do_snd vm)
   | MK_INL -> advance_cp (mk_inl vm)
   | MK_INR -> advance_cp (mk_inr vm)
-  | PUSH c -> advance_cp (push (c, vm))
+  | PUSH c -> advance_cp (push c vm)
   | APPLY -> apply vm
   | LOOKUP vp -> advance_cp (lookup vm.fp vm vp)
   | RETURN -> return vm
   | MK_CLOSURE (l, n) -> advance_cp (mk_closure (l, n, vm))
   | SWAP -> advance_cp (swap vm)
-  | POP -> advance_cp (pop (1, vm))
+  | POP -> advance_cp (pop 1 vm)
   | LABEL _ -> advance_cp vm
   | DEREF -> advance_cp (deref vm)
   | MK_REF -> advance_cp (mk_ref vm)
   | ASSIGN -> advance_cp (assign vm)
   | HALT -> { vm with status = Halted }
-  | GOTO (_, Some i) -> goto (i, vm)
-  | TEST (_, Some i) -> test (i, vm)
-  | CASE (_, Some i) -> case (i, vm)
+  | GOTO (_, Some i) -> goto i vm
+  | TEST (_, Some i) -> test i vm
+  | CASE (_, Some i) -> case i vm
   | _ -> Errors.complainf "step : bad state = %a" pp_state vm
 
 (* DRIVER *)
@@ -513,7 +511,7 @@ let initial_state l =
 let first_frame vm =
   let saved_fp = STACK_FP 0 in
   let return_index = STACK_RA 0 in
-  push (return_index, push (saved_fp, vm))
+  push return_index (push saved_fp vm)
 
 let run l =
   let vm = driver 1 (first_frame (initial_state l)) in
@@ -677,13 +675,11 @@ and comp_lambda vmap (f_opt, x, e) =
 
 let compile e =
   let defs, c = comp [] e in
-  let result =
-    (* body of program @ stop the interpreter @ function definitions *)
-    c @ [ HALT ] @ defs
-  in
+  (* body of program @ stop the interpreter @ function definitions *)
+  let result = c @ [ HALT ] @ defs in
 
   if Option.verbose then
-    Format.printf "Compiled Code = \n%a" pp_listing result;
+    Format.printf "Compiled Code = \n%a" pp_code result;
 
   result
 

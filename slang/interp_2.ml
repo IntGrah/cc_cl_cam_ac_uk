@@ -111,8 +111,8 @@ let step ({ code; stack; heap } as state) =
       let a, heap = Heap.alloc v heap in
       { code = ds; stack = V (Ref a) :: stack; heap }
   | WHILE (_, _) :: ds, V (Bool false) :: stack -> advance ds (V Unit :: stack)
-  | WHILE (c1, c2) :: ds, V (Bool true) :: stack ->
-      advance (c2 @ [ POP ] @ c1 @ [ WHILE (c1, c2) ] @ ds) stack
+  | WHILE (cond, body) :: ds, V (Bool true) :: stack ->
+      advance (body @ [ POP ] @ cond @ [ WHILE (cond, body) ] @ ds) stack
   | MK_CLOSURE c :: ds, stack ->
       advance ds (V (Fun (Closure (c, evs_to_env stack))) :: stack)
   | MK_REC (f, c) :: ds, stack ->
@@ -123,7 +123,7 @@ let step ({ code; stack; heap } as state) =
       advance (APPLY :: ds)
         (V (Fun (Closure (c, (f, Fun (Rec_closure (f, (c, env)))) :: env)))
         :: V v :: stack)
-  | _ -> Errors.complainf "step : bad state = %a" pp_state state
+  | _ -> Errors.complainf "Step: bad state = %a" pp_state state
 
 let rec driver n state =
   if Option.verbose then
@@ -182,8 +182,8 @@ let rec compile : Ast.t -> code = function
 
 let interpret (e : Ast.t) : value =
   let c = compile e in
+
   if Option.verbose then
     Format.printf "Compile code =@\n%a@." pp_code c;
 
-  (* The initial Slang state is the Slang state : all locations contain 0 *)
   driver 1 { code = c; stack = []; heap = Heap.empty }

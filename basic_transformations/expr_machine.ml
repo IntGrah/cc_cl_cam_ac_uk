@@ -56,15 +56,15 @@ type expr =
   | SUBT of expr * expr
   | MULT of expr * expr
 
-(* a few expressions for testing *)
-(* 1 + (2 + (3 + (4 + 5))) *)
+(* A few expressions for testing *)
+
+(** 1 + (2 + (3 + (4 + 5))) *)
 let test1 = PLUS (INT 1, PLUS (INT 2, PLUS (INT 3, PLUS (INT 4, INT 5))))
 
-(* (((1 + 2) + 3) + 4) + 5 *)
+(** (((1 + 2) + 3) + 4) + 5 *)
 let test2 = PLUS (PLUS (PLUS (PLUS (INT 1, INT 2), INT 3), INT 4), INT 5)
 
-(* string_of_expr : expr -> string *)
-let rec string_of_expr = function
+let rec string_of_expr : expr -> string = function
   | INT a -> string_of_int a
   | PLUS (e1, e2) -> "(" ^ string_of_expr e1 ^ " + " ^ string_of_expr e2 ^ ")"
   | SUBT (e1, e2) -> "(" ^ string_of_expr e1 ^ " - " ^ string_of_expr e2 ^ ")"
@@ -72,15 +72,12 @@ let rec string_of_expr = function
 
 (******************************* eval **************************************)
 
-(* eval : expr -> int
-   a simple recursive evaluator for expressions.
+(** A simple recursive evaluator for expressions.
 
-   This is a very simple version of our interpreter_0.
+    This is a very simple version of our interpreter_0.
 
-   Claim 1 : This interpreter (eval) is correct!
-   Proof: by inspection ;-)
-*)
-let rec eval = function
+    Claim 1 : This interpreter (eval) is correct! Proof: by inspection ;-) *)
+let rec eval : expr -> int = function
   | INT a -> a
   | PLUS (e1, e2) -> eval e1 + eval e2
   | SUBT (e1, e2) -> eval e1 - eval e2
@@ -88,13 +85,12 @@ let rec eval = function
 
 (******************************* eval_2 **************************************)
 
-(* apply cps transform to the interpreter eval *)
+(* Apply cps transform to the interpreter eval *)
 
 type cnt_2 = int -> int
 type state_2 = expr * cnt_2
 
-(* eval_aux_2 : state_2 -> int *)
-let rec eval_aux_2 (e, cnt) =
+let rec eval_aux_2 ((e, cnt) : state_2) : int =
   match e with
   | INT a -> cnt a
   | PLUS (e1, e2) ->
@@ -104,16 +100,14 @@ let rec eval_aux_2 (e, cnt) =
   | MULT (e1, e2) ->
       eval_aux_2 (e1, fun v1 -> eval_aux_2 (e2, fun v2 -> cnt (v1 * v2)))
 
+let id : cnt_2 = fun x -> x
+
 (*
-    Claim 2 : c (eval e) = eval_aux_2(e, c)
+    Claim 2: c (eval e) = eval_aux_2(e, c)
     Proof: by induction on the structure of e.
 *)
 
-(* id_cnt : cnt_2 *)
-let id_cnt (x : int) = x
-
-(*  eval_2 : expr -> int *)
-let eval_2 e = eval_aux_2 (e, id_cnt)
+let eval_2 : expr -> int = fun e -> eval_aux_2 (e, id)
 
 (******************************* eval_3 **************************************)
 
@@ -128,8 +122,8 @@ let eval_2 e = eval_aux_2 (e, id_cnt)
 
   < fun v2 -> cnt(v1 + v2) >
        = INNER_PLUS(v1, < cnt >)
-
 *)
+
 type cnt_3 =
   | ID
   | OUTER_PLUS of expr * cnt_3
@@ -141,13 +135,16 @@ type cnt_3 =
 
 type state_3 = expr * cnt_3
 
-(* apply_3 : cnt_3 * int -> int
+(** Claim 3 :
 
-   Claim 3 : For c : cnt_2 and v : int,  c(v) = apply_3(< c >, v) AND
-             for all e, c, eval_aux_2 (e, c) =  eval_aux_3 (e, < c >).
-   Proof : by induction on the structure of < c >.
-*)
-let rec apply_3 = function
+    forall c : cnt_2, v : int, c v = apply_3 (< c >, v)
+
+    AND
+
+    forall e, c, eval_aux_2 (e, c) = eval_aux_3 (e, < c >).
+
+    Proof : by induction on the structure of < c >. *)
+let rec apply_3 : cnt_3 * int -> int = function
   | ID, v -> v
   | OUTER_PLUS (e2, cnt), v1 -> eval_aux_3 (e2, INNER_PLUS (v1, cnt))
   | OUTER_SUBT (e2, cnt), v1 -> eval_aux_3 (e2, INNER_SUBT (v1, cnt))
@@ -156,17 +153,14 @@ let rec apply_3 = function
   | INNER_SUBT (v1, cnt), v2 -> apply_3 (cnt, v1 - v2)
   | INNER_MULT (v1, cnt), v2 -> apply_3 (cnt, v1 * v2)
 
-(* eval_aux_2 : state_3 -> int
-*)
-and eval_aux_3 (e, cnt) =
+and eval_aux_3 ((e, cnt) : state_3) : int =
   match e with
   | INT a -> apply_3 (cnt, a)
   | PLUS (e1, e2) -> eval_aux_3 (e1, OUTER_PLUS (e2, cnt))
   | SUBT (e1, e2) -> eval_aux_3 (e1, OUTER_SUBT (e2, cnt))
   | MULT (e1, e2) -> eval_aux_3 (e1, OUTER_MULT (e2, cnt))
 
-(* eval_3 : expr -> int *)
-let eval_3 e = eval_aux_3 (e, ID)
+let eval_3 : expr -> int = fun e -> eval_aux_3 (e, ID)
 
 (******************************* eval_4 **************************************)
 
@@ -202,14 +196,16 @@ let string_of_tag = function
 type cnt_4 = tag list
 type state_4 = expr * cnt_4
 
-(* apply_4 : cnt_4 * int -> int
+(** Claim 4:
 
-   Claim 4 : For all e, c
-             (1) for all v, apply_3(c, v)  = apply_4(< c >, v) and
-             (2) eval_aux_3 (e, c) =  eval_aux_4 (e, < c >).
-   Proof : by induction on the structure of e and c.
-*)
-let rec apply_4 = function
+    For all e, c,
+
+    (1) for all v, apply_3(c, v) = apply_4(< c >, v)
+
+    (2) eval_aux_3 (e, c) = eval_aux_4 (e, < c >).
+
+    Proof : by induction on the structure of e and c. *)
+let rec apply_4 : cnt_4 * int -> int = function
   | [], v -> v
   | O_PLUS e2 :: cnt, v1 -> eval_aux_4 (e2, I_PLUS v1 :: cnt)
   | O_SUBT e2 :: cnt, v1 -> eval_aux_4 (e2, I_SUBT v1 :: cnt)
@@ -218,17 +214,14 @@ let rec apply_4 = function
   | I_SUBT v1 :: cnt, v2 -> apply_4 (cnt, v1 - v2)
   | I_MULT v1 :: cnt, v2 -> apply_4 (cnt, v1 * v2)
 
-(* eval_aux_4 : state_4 -> int
-*)
-and eval_aux_4 (e, cnt) =
+and eval_aux_4 ((e, cnt) : state_4) : int =
   match e with
   | INT a -> apply_4 (cnt, a)
   | PLUS (e1, e2) -> eval_aux_4 (e1, O_PLUS e2 :: cnt)
   | SUBT (e1, e2) -> eval_aux_4 (e1, O_SUBT e2 :: cnt)
   | MULT (e1, e2) -> eval_aux_4 (e1, O_MULT e2 :: cnt)
 
-(* eval_4 : expr -> int *)
-let eval_4 e = eval_aux_4 (e, [])
+let eval_4 (e : expr) : int = eval_aux_4 (e, [])
 
 (******************************* eval_5 **************************************)
 
@@ -241,25 +234,23 @@ let eval_4 e = eval_aux_4 (e, [])
 
    We can always combine such functions int a single recursive function
    by "tagging" the two inputs.
-
 *)
+
 type state_5 =
   | APPLY of cnt_4 * int (* APPLY(c, m) represents a call apply_4(c, m) *)
   | EVAL of cnt_4 * expr (* EVAL(c, e) represents a call eval_aux_4(e, c) *)
 
 let string_of_state5 n = function
   | EVAL (cnt, e) ->
-      "step " ^ string_of_int n ^ " (EVAL)" ^ "\ncnt = "
-      ^ string_of_list string_of_tag (List.rev cnt)
-      ^ "\nexpr = " ^ string_of_expr e ^ "\n"
+      Format.sprintf "step %d (EVAL)\ncnt = %s\nexpr = %s\n" n
+        (string_of_list string_of_tag (List.rev cnt))
+        (string_of_expr e)
   | APPLY (cnt, m) ->
-      "step " ^ string_of_int n ^ " (APPLY)" ^ "\ncnt = "
-      ^ string_of_list string_of_tag (List.rev cnt)
-      ^ "\nint = " ^ string_of_int m ^ "\n"
+      Format.sprintf "step %d (APPLY)\ncnt = %s\nint = %d\n" n
+        (string_of_list string_of_tag (List.rev cnt))
+        m
 
-(* step : state_5 -> state_5 *)
-
-let step_5 = function
+let step_5 : state_5 -> state_5 = function
   | EVAL (cnt, INT m) -> APPLY (cnt, m)
   | EVAL (cnt, PLUS (e1, e2)) -> EVAL (O_PLUS e2 :: cnt, e1)
   | EVAL (cnt, SUBT (e1, e2)) -> EVAL (O_SUBT e2 :: cnt, e1)
@@ -272,22 +263,21 @@ let step_5 = function
   | APPLY (I_MULT v1 :: cnt, v2) -> APPLY (cnt, v1 * v2)
   | APPLY ([], v) -> APPLY ([], v)
 
-(* driver : state_5 -> int
-   This is clearly TAIL RECURSIVE!
+(** driver : state_5 -> int This is clearly TAIL RECURSIVE!
 
-   Claim.5 : (ignoring first argument that counts steps)
-      driver_5 (APPLY(c, m)) = apply_4(c, m)
-      driver_5 (EVAL(c, e))  = eval_aux_4 (e, c)
-   Proof : induction on e and c.
+    Claim 5: (ignoring first argument that counts steps)
 
-*)
-let rec driver_5 n state =
+    (1) driver_5 (APPLY(c, m)) = apply_4(c, m)
+
+    (2) driver_5 (EVAL(c, e)) = eval_aux_4 (e, c)
+
+    Proof : induction on e and c. *)
+let rec driver_5 n (state : state_5) : int =
   if !verbose then
     print_string (string_of_state5 n state);
   match state with APPLY ([], v) -> v | _ -> driver_5 (n + 1) (step_5 state)
 
-(* eval_5 : expr -> int *)
-let eval_5 e = driver_5 1 (EVAL ([], e))
+let eval_5 (e : expr) : int = driver_5 1 (EVAL ([], e))
 
 (******************************* eval_6 **************************************)
 
@@ -346,14 +336,11 @@ let string_of_directive = function
 
 let string_of_state6 n = function
   | ds, vs ->
-      "state " ^ string_of_int n ^ "\nDS = "
-      ^ string_of_list string_of_directive (List.rev ds)
-      ^ "\nVS = "
-      ^ string_of_list string_of_int (List.rev vs)
-      ^ "\n"
+      Format.sprintf "state %d\nDS = %s\nVS = %s\n" n
+        (string_of_list string_of_directive (List.rev ds))
+        (string_of_list string_of_int (List.rev vs))
 
-(* step_6 : state_6 -> state_6 *)
-let step_6 = function
+let step_6 : state_6 -> state_6 = function
   | E (INT v) :: ds, vs -> (ds, v :: vs)
   | E (PLUS (e1, e2)) :: ds, vs -> (E e1 :: E e2 :: DO_PLUS :: ds, vs)
   | E (SUBT (e1, e2)) :: ds, vs -> (E e1 :: E e2 :: DO_SUBT :: ds, vs)
@@ -363,13 +350,12 @@ let step_6 = function
   | DO_MULT :: ds, v2 :: v1 :: vs -> (ds, (v1 * v2) :: vs)
   | _ -> failwith "eval : runtime error!"
 
-(* driver_6 : state_6 -> int *)
-let rec driver_6 n state =
+let rec driver_6 n (state : state_6) : int =
   if !verbose then
     print_string (string_of_state6 n state);
   match state with [], [ v ] -> v | _ -> driver_6 (n + 1) (step_6 state)
 
-let eval_6 e = driver_6 1 ([ E e ], [])
+let eval_6 (e : expr) : int = driver_6 1 ([ E e ], [])
 
 (*  side-by-side traces
 
@@ -543,29 +529,26 @@ int = 15                             | VS = [15]
    In other words, let's re-factor eval_6 so and define a function
    "compile" and eval_7 so that  eval_6(e) = eval_7(compile(e)).
 *)
+
 type instr = Ipush of int | Iplus | Isubt | Imult
 type code = instr list
 type state_7 = code * value_stack
 
-(* compile : expr -> code
-
-   Note similarity with the lines of step_6 mentioned above!
-*)
-let rec compile = function
+(** Note similarity with the lines of step_6 mentioned above! *)
+let rec compile : expr -> code = function
   | INT a -> [ Ipush a ]
   | PLUS (e1, e2) -> compile e1 @ compile e2 @ [ Iplus ]
   | SUBT (e1, e2) -> compile e1 @ compile e2 @ [ Isubt ]
   | MULT (e1, e2) -> compile e1 @ compile e2 @ [ Imult ]
 
-(* step_7 : state_7 -> state_7 *)
-let step_7 = function
+let step_7 : state_7 -> state_7 = function
   | Ipush v :: is, vs -> (is, v :: vs)
   | Iplus :: is, v2 :: v1 :: vs -> (is, (v1 + v2) :: vs)
   | Isubt :: is, v2 :: v1 :: vs -> (is, (v1 - v2) :: vs)
   | Imult :: is, v2 :: v1 :: vs -> (is, (v1 * v2) :: vs)
   | _ -> failwith "eval : runtime error!"
 
-let rec string_of_instr = function
+let string_of_instr = function
   | Ipush a -> "push " ^ string_of_int a
   | Iplus -> "add"
   | Isubt -> "sub"
@@ -579,13 +562,12 @@ let string_of_state7 n = function
       ^ string_of_list string_of_int (List.rev vs)
       ^ "\n"
 
-(* driver_7 : state_7 -> int *)
-let rec driver_7 n state =
+let rec driver_7 n (state : state_7) : int =
   if !verbose then
     print_string (string_of_state7 n state);
   match state with [], [ v ] -> v | _ -> driver_7 (n + 1) (step_7 state)
 
-let eval_7 e = driver_7 1 (compile e, [])
+let eval_7 (e : expr) : int = driver_7 1 (compile e, [])
 
 (* 			
 
@@ -730,6 +712,4 @@ VS = [15]                                | VS = [15]
 
    We have transformed the recursive "semantics" of expressions
    into a compiler + a stack machine.
-
-
 *)

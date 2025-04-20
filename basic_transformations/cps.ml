@@ -7,23 +7,23 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
 
 let rec fib (m : int) : int =
   if m = 0 then
-    1
+    0
   else if m = 1 then
     1
   else
     fib (m - 1) + fib (m - 2)
 
-(* note : fib_cps (m, f) = f (fib m) *)
+(** Note : fib_cps (m, f) = f (fib m) *)
 let rec fib_cps (m, cnt) : int =
   if m = 0 then
-    cnt 1
+    cnt 0
   else if m = 1 then
     cnt 1
   else
     fib_cps (m - 1, fun a -> fib_cps (m - 2, fun b -> cnt (a + b)))
 
-(* the initial continuation *)
+(** The initial continuation *)
 let id (x : int) : int = x
 
-(* note : fib_1 m = fib_cps (m, id) = id (fib m) = fib m *)
+(** note : fib_1 m = fib_cps (m, id) = id (fib m) = fib m *)
 let fib_1 (m : int) : int = fib_cps (m, id)

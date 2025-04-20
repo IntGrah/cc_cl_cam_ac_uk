@@ -25,25 +25,19 @@
 
 *)
 
-(* start with the standard definition
-
-   fib : int -> int
-*)
+(** Start with the standard definition *)
 let rec fib m =
   if m = 0 then
-    1
+    0
   else if m = 1 then
     1
   else
     fib (m - 1) + fib (m - 2)
 
-(* Now, apply cps transform.
-
-   fib_cps : (int *(int -> int)) -> int
-*)
+(* Now, apply cps transform. *)
 let rec fib_cps (m, cnt) : int =
   if m = 0 then
-    cnt 1
+    cnt 0
   else if m = 1 then
     cnt 1
   else
@@ -52,7 +46,7 @@ let rec fib_cps (m, cnt) : int =
 (* Here is a version using lets, not "lambdas" *)
 let rec fib_cps_v2 (m, cnt) =
   if m = 0 then
-    cnt 1
+    cnt 0
   else if m = 1 then
     cnt 1
   else
@@ -75,7 +69,7 @@ let rec apply_cnt : cnt * int -> int = function
 
 and fib_cps_dfc (m, cnt) : int =
   if m = 0 then
-    apply_cnt (cnt, 1)
+    apply_cnt (cnt, 0)
   else if m = 1 then
     apply_cnt (cnt, 1)
   else
@@ -91,7 +85,7 @@ let fib_2 m = fib_cps_dfc (m, ID)
    I'll give the tags suggestive names.
 *)
 
-type tag = SUB2 of int | PLUS of int
+type tag = SUB2 of int | PLUS of int [@@deriving show]
 type tag_list_cnt = tag list
 
 let rec apply_tag_list_cnt : tag_list_cnt * int -> int = function
@@ -101,7 +95,7 @@ let rec apply_tag_list_cnt : tag_list_cnt * int -> int = function
 
 and fib_cps_dfc_tags (m, cnt) : int =
   if m = 0 then
-    apply_tag_list_cnt (cnt, 1)
+    apply_tag_list_cnt (cnt, 0)
   else if m = 1 then
     apply_tag_list_cnt (cnt, 1)
   else
@@ -126,12 +120,13 @@ let fib_3 (m : int) : int = fib_cps_dfc_tags (m, [])
 type state_type =
   | SUB1 (* for right-hand-sides starting with fib_   *)
   | APPL (* for right-hand-sides starting with apply_ *)
+[@@deriving show]
 
 type state = state_type * int * tag_list_cnt
 
 (* We now rewrite the version above as a state-transition evaluator. *)
 let rec eval : state -> int = function
-  | SUB1, 0, cnt -> eval (APPL, 1, cnt)
+  | SUB1, 0, cnt -> eval (APPL, 0, cnt)
   | SUB1, 1, cnt -> eval (APPL, 1, cnt)
   | SUB1, m, cnt -> eval (SUB1, m - 1, SUB2 m :: cnt)
   | APPL, a, SUB2 m :: cnt -> eval (SUB1, m - 2, PLUS a :: cnt)
@@ -151,43 +146,22 @@ let fib_4 (m : int) : int = eval (SUB1, m, [])
 *)
 
 let step : state -> state = function
-  | SUB1, 0, cnt -> (APPL, 1, cnt)
+  | SUB1, 0, cnt -> (APPL, 0, cnt)
   | SUB1, 1, cnt -> (APPL, 1, cnt)
   | SUB1, m, cnt -> (SUB1, m - 1, SUB2 m :: cnt)
   | APPL, a, SUB2 m :: cnt -> (SUB1, m - 2, PLUS a :: cnt)
   | APPL, b, PLUS a :: cnt -> (APPL, a + b, cnt)
   | _ -> failwith "step : runtime error!"
 
-let string_of_state_type = function SUB1 -> "SUB1" | APPL -> "APPL"
-
-let string_of_tag = function
-  | SUB2 m -> "SUB2 " ^ string_of_int m
-  | PLUS m -> "PLUS " ^ string_of_int m
-
-let rec string_of_tag_list_aux = function
-  | [] -> ""
-  | [ t ] -> string_of_tag t
-  | t :: rest -> string_of_tag t ^ ", " ^ string_of_tag_list_aux rest
-
-let string_of_tag_list l = "[" ^ string_of_tag_list_aux l ^ "]"
-
 let print_state n (t, m, cnt) =
-  print_string
-    (string_of_int n ^ " " ^ string_of_state_type t ^ " || " ^ string_of_int m
-   ^ " || "
-     (* reverse stack so that it grows to the right, shrinks to the left *)
-    ^ string_of_tag_list (List.rev cnt)
-    ^ "\n")
+  Format.printf "%d %a || %d || %s\n" n pp_state_type t m
+    ([%show: tag list] (List.rev cnt))
 
-(* set to false if you don't want to watch the machine's transitions ... *)
+(** Set to false if you don't want to watch the machine's transitions ... *)
 let verbose = ref true
 
-(*
-   The OCaml compiler probably compiles this recursive function
-   into iteration (no stack).  Of course we have build "the stack"
-   into our machine ;-)
-
-*)
+(** The OCaml compiler probably compiles this recursive function into iteration
+    (no stack). Of course we have build "the stack" into our machine ;-) *)
 let rec eval_steps (n : int) (state : state) : int =
   if !verbose then
     print_state n state;
@@ -195,7 +169,7 @@ let rec eval_steps (n : int) (state : state) : int =
 
 let fib_5 (m : int) : int = eval_steps 1 (SUB1, m, [])
 
-(* just for testing to see if all versions return the same value *)
+(** Just for testing to see if all versions return the same value *)
 let fibs (m : int) = (fib m, fib_1 m, fib_2 m, fib_3 m, fib_4 m, fib_5 m)
 
 (* Here is a trace of fib_5 6.

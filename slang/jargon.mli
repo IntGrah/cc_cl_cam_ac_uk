@@ -92,4 +92,4 @@ val pp_location : Format.formatter -> location -> unit
 val pp_value_path : Format.formatter -> value_path -> unit
 val pp_value : Format.formatter -> vm_state -> unit
 val reset : unit -> unit
-val pp_listing : Format.formatter -> code -> unit
+val pp_code : Format.formatter -> code -> unit
