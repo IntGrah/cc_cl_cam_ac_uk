@@ -47,8 +47,8 @@ let rec string_list_of_code c =
   | s :: t -> ("[" ^ s) :: apply_to_last (fun s -> s ^ "]") t
 
 and string_list_of_instruction : instruction -> string list = function
-  | UNARY op -> [ "UNARY " ^ Ast.Unary_op.to_string op ]
-  | OPER op -> [ "OPER " ^ Ast.Binary_op.to_string op ]
+  | UNARY op -> [ Format.asprintf "UNARY %a" Ast.Unary_op.pp op ]
+  | OPER op -> [ Format.asprintf "OPER %a" Ast.Binary_op.pp op ]
   | MK_PAIR -> [ "MK_PAIR" ]
   | FST -> [ "FST" ]
   | SND -> [ "SND" ]

@@ -1,5 +1,7 @@
 type var = string
 
+val pp_var : Format.formatter -> var -> unit
+
 module Unary_op : sig
   type t = Neg | Not | Read
 
@@ -12,8 +14,8 @@ module Binary_op : sig
   type t = Add | Sub | Mul | Div | Lt | And | Or | Eqi | Eqb
 
   val to_fun : t -> 'a Value.t * 'a Value.t -> 'a Value.t
-  val to_string : t -> var
   val pp : Format.formatter -> t -> unit
+  val pp_nice : Format.formatter -> t -> unit
 end
 
 type t =

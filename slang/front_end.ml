@@ -13,9 +13,9 @@ let parse file lexbuf =
   in
   if Option.verbose_front then
     if Option.verbose_tree then
-      Format.printf "Parsed result:@.%a" Past.pp_nice e
+      Format.printf "==== Parsed result ====@.%a@." Past.pp_nice e
     else
-      Format.printf "Parsed result:@.%a" Past.pp e;
+      Format.printf "==== Parsed result ====@.%a@." Past.pp e;
   e
 
 (** Perform static checks and translate from Past to Ast *)
@@ -28,9 +28,9 @@ let check filename e =
   in
   if Option.verbose_front then
     if Option.verbose_tree then
-      Format.printf "After static checks: %a" Ast.pp_nice e'
+      Format.printf "==== After static checks ====@.%a@." Ast.pp_nice e'
     else
-      Format.printf "After static checks: %a" Ast.pp e';
+      Format.printf "==== After static checks ====@.%a@." Ast.pp e';
 
   e'
 

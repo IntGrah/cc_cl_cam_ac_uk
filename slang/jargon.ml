@@ -122,8 +122,8 @@ let pp_location fmt = function
   | l, Some i -> Format.fprintf fmt "%s = %d" l i
 
 let pp_instruction fmt = function
-  | UNARY op -> Format.fprintf fmt "UNARY %s" (Ast.Unary_op.to_string op)
-  | OPER op -> Format.fprintf fmt "OPER %s" (Ast.Binary_op.to_string op)
+  | UNARY op -> Format.fprintf fmt "UNARY %a" Ast.Unary_op.pp op
+  | OPER op -> Format.fprintf fmt "OPER %a" Ast.Binary_op.pp op
   | MK_PAIR -> Format.fprintf fmt "MK_PAIR"
   | FST -> Format.fprintf fmt "FST"
   | SND -> Format.fprintf fmt "SND"
@@ -294,8 +294,8 @@ let do_oper : Ast.Binary_op.t * stack_item * stack_item -> stack_item = function
   | Mul, STACK_INT m, STACK_INT n -> STACK_INT (m * n)
   | Div, STACK_INT m, STACK_INT n -> STACK_INT (m / n)
   | op, _, _ ->
-      Errors.complain
-        ("do_oper: malformed binary operator: " ^ Ast.Binary_op.to_string op)
+      Errors.complainf "do_oper: malformed binary operator: %a" Ast.Binary_op.pp
+        op
 
 let perform_op (op, vm) =
   let v_right, vm1 = pop_top vm in

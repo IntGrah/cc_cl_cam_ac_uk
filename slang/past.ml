@@ -1,4 +1,4 @@
-type var = string
+type var = string [@@deriving show]
 
 module Loc = struct
   type t = Lexing.position
@@ -9,37 +9,26 @@ module Loc = struct
 end
 
 module Unary_op = struct
-  type t = Neg | Not
+  type t = Neg | Not [@@deriving show { with_path = false }]
 
-  let to_string = function Neg -> "Neg" | Not -> "Not"
-
-  let pp ppf = function
-    | Neg -> Format.fprintf ppf "-"
-    | Not -> Format.fprintf ppf "~"
+  let pp_nice fmt = function
+    | Neg -> Format.fprintf fmt "-"
+    | Not -> Format.fprintf fmt "~"
 end
 
 module Binary_op = struct
   type t = Add | Sub | Mul | Div | Lt | And | Or | Eq
+  [@@deriving show { with_path = false }]
 
-  let to_string = function
-    | Add -> "Add"
-    | Sub -> "Sub"
-    | Mul -> "Mul"
-    | Div -> "Div"
-    | Lt -> "Lt"
-    | And -> "And"
-    | Or -> "Or"
-    | Eq -> "Eq"
-
-  let pp ppf = function
-    | Add -> Format.fprintf ppf "+"
-    | Sub -> Format.fprintf ppf "-"
-    | Mul -> Format.fprintf ppf "*"
-    | Div -> Format.fprintf ppf "/"
-    | Lt -> Format.fprintf ppf "<"
-    | And -> Format.fprintf ppf "&&"
-    | Or -> Format.fprintf ppf "||"
-    | Eq -> Format.fprintf ppf "="
+  let pp_nice fmt = function
+    | Add -> Format.fprintf fmt "+"
+    | Sub -> Format.fprintf fmt "-"
+    | Mul -> Format.fprintf fmt "*"
+    | Div -> Format.fprintf fmt "/"
+    | Lt -> Format.fprintf fmt "<"
+    | And -> Format.fprintf fmt "&&"
+    | Or -> Format.fprintf fmt "||"
+    | Eq -> Format.fprintf fmt "="
 end
 
 type t = { loc : Loc.t; expr : expr }
@@ -69,45 +58,9 @@ and expr =
   | Let of var * Type.t * t * t
   | LetFun of var * lambda * Type.t * t
 
-and lambda = var * Type.t * t
+and lambda = var * Type.t * t [@@deriving show { with_path = false }]
 
 open Format
-
-let rec pp fmt t =
-  match t.expr with
-  | Unit -> fprintf fmt "Unit"
-  | What -> fprintf fmt "What"
-  | Var x -> fprintf fmt "Var %s" x
-  | Integer n -> fprintf fmt "Integer %d" n
-  | Boolean b -> fprintf fmt "Boolean %b" b
-  | UnaryOp (op, e) ->
-      fprintf fmt "UnaryOp(%s, %a)" (Unary_op.to_string op) pp e
-  | BinaryOp (e1, op, e2) ->
-      fprintf fmt "Op(%a, %a, %a)" pp e1 Binary_op.pp op pp e2
-  | If (e1, e2, e3) -> fprintf fmt "If(%a, %a, %a)" pp e1 pp e2 pp e3
-  | Pair (e1, e2) -> fprintf fmt "Pair(%a, %a)" pp e1 pp e2
-  | Fst e -> fprintf fmt "Fst(%a)" pp e
-  | Snd e -> fprintf fmt "Snd(%a)" pp e
-  | Inl (t, e) -> fprintf fmt "Inl(%a, %a)" Type.pp t pp e
-  | Inr (t, e) -> fprintf fmt "Inr(%a, %a)" Type.pp t pp e
-  | Case (e, (x1, t1, e1), (x2, t2, e2)) ->
-      fprintf fmt "Case(%a, (%s, %a, %a), (%s, %a, %a))" pp e x1 Type.pp t1 pp
-        e1 x2 Type.pp t2 pp e2
-  | While (e1, e2) -> fprintf fmt "While(%a, %a)" pp e1 pp e2
-  | Seq el ->
-      fprintf fmt "Seq(%a)"
-        (Format.pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "; ") pp)
-        el
-  | Ref e -> fprintf fmt "Ref(%a)" pp e
-  | Deref e -> fprintf fmt "Deref(%a)" pp e
-  | Assign (e1, e2) -> fprintf fmt "Assign(%a, %a)" pp e1 pp e2
-  | Lambda (x, t, e) -> fprintf fmt "Lambda(%s, %a, %a)" x Type.pp t pp e
-  | App (e1, e2) -> fprintf fmt "App(%a, %a)" pp e1 pp e2
-  | Let (x, t, e1, e2) ->
-      fprintf fmt "Let(%s, %a, %a, %a)" x Type.pp t pp e1 pp e2
-  | LetFun (f, (x, t1, e1), t2, e2) ->
-      fprintf fmt "LetFun(%s, (%s, %a, %a), %a, %a)" f x Type.pp t1 pp e1
-        Type.pp t2 pp e2
 
 (*
    Documentation of Format can be found here:
@@ -122,9 +75,9 @@ let rec pp_nice ppf t =
   | Var x -> fprintf ppf "%s" x
   | Integer n -> fprintf ppf "%d" n
   | Boolean b -> fprintf ppf "%b" b
-  | UnaryOp (op, e) -> fprintf ppf "%a(%a)" Unary_op.pp op pp_nice e
+  | UnaryOp (op, e) -> fprintf ppf "%a(%a)" Unary_op.pp_nice op pp_nice e
   | BinaryOp (e1, op, e2) ->
-      fprintf ppf "(%a %a %a)" pp_nice e1 Binary_op.pp op pp_nice e2
+      fprintf ppf "(%a %a %a)" pp_nice e1 Binary_op.pp_nice op pp_nice e2
   | If (e1, e2, e3) ->
       fprintf ppf "@[if %a then %a else %a @]" pp_nice e1 pp_nice e2 pp_nice e3
   | Pair (e1, e2) -> fprintf ppf "(%a, %a)" pp_nice e1 pp_nice e2

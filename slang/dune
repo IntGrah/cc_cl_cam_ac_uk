@@ -24,7 +24,7 @@
   Static
   Option)
  (preprocess
-  (pps ppx_deriving_yojson)))
+  (pps ppx_deriving.show ppx_deriving_yojson)))
 
 (executable
  (name slang)

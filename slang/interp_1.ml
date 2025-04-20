@@ -37,30 +37,12 @@ and continuation_action =
 
 and continuation = continuation_action list
 and binding = Ast.var * value
-and env = binding list
-
-let rec pp_value fmt = Value.pp pp_fun fmt
-
-and pp_fun fmt = function
-  | Closure clo -> Format.fprintf fmt "Closure(%a)" pp_closure clo
-  | Rec_closure (f, clo) ->
-      Format.fprintf fmt "Rec_closure(%s, %a)" f pp_closure clo
-
-and pp_closure fmt (var, e, env) =
-  Format.fprintf fmt "%s, %a, %a" var Ast.pp e pp_env env
-
-and pp_env fmt env =
-  Format.fprintf fmt "[%a]"
-    (Format.pp_print_list
-       ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@.")
-       pp_binding)
-    env
-
-and pp_binding fmt (x, v) = Format.fprintf fmt "(%s, %a)" x pp_value v
+and env = binding list [@@deriving show { with_path = false }]
 
 type state =
   | INSPECT of Ast.t * env * continuation
   | COMPUTE of continuation * value
+[@@deriving show { with_path = false }]
 
 let update (x, v) env = (x, v) :: env
 
@@ -76,65 +58,6 @@ let mk_rec_fun (f, x, body, env) : value =
   let fvars = Free_vars.free_vars [ f; x ] body in
   let smaller_env = filter_env fvars env in
   Fun (Rec_closure (f, (x, body, smaller_env)))
-
-(** for a recursive function [f] we want
-    [lookup (env, f) = FUN(true, (x, body, env))] *)
-let lookup x env : value =
-  let rec aux : env -> value = function
-    | [] -> Errors.complainf "%s is not defined!" x
-    | (y, v) :: rest ->
-        if x = y then
-          v
-        else
-          aux rest
-  in
-  aux env
-
-let pp_expr_list =
-  Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ";@.") Ast.pp
-
-let pp_continuation_action fmt = function
-  | UNARY op -> Format.fprintf fmt "UNARY %s" (Ast.Unary_op.to_string op)
-  | MKPAIR v -> Format.fprintf fmt "MKPAIR %a" pp_value v
-  | FST -> Format.fprintf fmt "FST"
-  | SND -> Format.fprintf fmt "SND"
-  | MKINL -> Format.fprintf fmt "MKINL"
-  | MKINR -> Format.fprintf fmt "MKINR"
-  | APPLY v -> Format.fprintf fmt "APPLY %a" pp_value v
-  | ARG (e, env) -> Format.fprintf fmt "ARG(%a, %a)" Ast.pp e pp_env env
-  | OPER (op, v) ->
-      Format.fprintf fmt "OPER(%s, %a)" (Ast.Binary_op.to_string op) pp_value v
-  | CASE (x1, e1, x2, e2, env) ->
-      Format.fprintf fmt "CASE(%s, %a, %s, %a, %a)" x1 Ast.pp e1 x2 Ast.pp e2
-        pp_env env
-  | PAIR_FST (e, env) ->
-      Format.fprintf fmt "PAIR_FST(%a, %a)" Ast.pp e pp_env env
-  | OPER_FST (e, env, op) ->
-      Format.fprintf fmt "OPER_FST(%a, %a, %s)" Ast.pp e pp_env env
-        (Ast.Binary_op.to_string op)
-  | IF (e1, e2, env) ->
-      Format.fprintf fmt "IF(%a, %a, %a)" Ast.pp e1 Ast.pp e2 pp_env env
-  | ASSIGN v -> Format.fprintf fmt "ASSIGN %a" pp_value v
-  | ASSIGN_FST (e, env) ->
-      Format.fprintf fmt "ASSIGN_FST(%a, %a)" Ast.pp e pp_env env
-  | TAIL (el, env) ->
-      Format.fprintf fmt "TAIL(%a, %a)" pp_expr_list el pp_env env
-  | WHILE (e1, e2, env) ->
-      Format.fprintf fmt "WHILE(%a, %a, %a)" Ast.pp e1 Ast.pp e2 pp_env env
-  | MKREF -> Format.fprintf fmt "MKREF"
-  | DEREF -> Format.fprintf fmt "DEREF"
-
-let pp_continuation =
-  Format.pp_print_list
-    ~pp_sep:(fun fmt () -> Format.fprintf fmt ";@.")
-    pp_continuation_action
-
-let pp_state fmt = function
-  | INSPECT (e, env, cnt) ->
-      Format.fprintf fmt "INSPECT(%a, %a, %a)" Ast.pp e pp_env env
-        pp_continuation cnt
-  | COMPUTE (cnt, v) ->
-      Format.fprintf fmt "COMPUTE(%a, %a)" pp_continuation cnt pp_value v
 
 let heap = Array.make Option.heap_max (Value.Int 0)
 
@@ -180,7 +103,7 @@ let step = function
       INSPECT (e1, env, WHILE (e1, e2, env) :: k)
   (* INSPECT --> COMPUTE *)
   | INSPECT (Unit, _, k) -> COMPUTE (k, Unit)
-  | INSPECT (Var x, env, k) -> COMPUTE (k, lookup x env)
+  | INSPECT (Var x, env, k) -> COMPUTE (k, List.assoc x env)
   | INSPECT (Integer n, _, k) -> COMPUTE (k, Int n)
   | INSPECT (Boolean b, _, k) -> COMPUTE (k, Bool b)
   | INSPECT (Lambda (x, body), env, k) -> COMPUTE (k, mk_fun (x, body, env))

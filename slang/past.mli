@@ -9,15 +9,15 @@ end
 module Unary_op : sig
   type t = Neg | Not
 
-  val to_string : t -> var
   val pp : Format.formatter -> t -> unit
+  val pp_nice : Format.formatter -> t -> unit
 end
 
 module Binary_op : sig
   type t = Add | Sub | Mul | Div | Lt | And | Or | Eq
 
-  val to_string : t -> var
   val pp : Format.formatter -> t -> unit
+  val pp_nice : Format.formatter -> t -> unit
 end
 
 type t = { loc : Lexing.position; expr : expr }

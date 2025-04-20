@@ -117,8 +117,8 @@ and pp_location fmt = function
   | l, Some i -> Format.fprintf fmt "%s = %d" l i
 
 and pp_instruction fmt = function
-  | UNARY op -> Format.fprintf fmt "  UNARY %s" (Ast.Unary_op.to_string op)
-  | OPER op -> Format.fprintf fmt "  OPER %s" (Ast.Binary_op.to_string op)
+  | UNARY op -> Format.fprintf fmt "  UNARY %a" Ast.Unary_op.pp op
+  | OPER op -> Format.fprintf fmt "  OPER %a" Ast.Binary_op.pp op
   | MK_PAIR -> Format.fprintf fmt "  MK_PAIR"
   | FST -> Format.fprintf fmt "  FST"
   | SND -> Format.fprintf fmt "  SND"
