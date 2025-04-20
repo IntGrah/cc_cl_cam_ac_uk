@@ -4,18 +4,18 @@ open Interp_2
 type 'a steps = Interp_2.state list
 
 let rec driver state =
-  match state with
-  | [], _, _ -> [ state ]
+  match state.code with
+  | [] -> [ state ]
   | _ -> state :: driver (Interp_2.step state)
 
 let steps e =
   let c = Interp_2.compile e in
-  driver (c, [], Heap.empty)
+  driver { code = c; stack = []; heap = Heap.empty }
 
 let string_list_of_code code =
   List.map (Format.asprintf "%a" Interp_2.pp_instruction) code
 
-let string_list_of_env env =
+let string_list_of_stack env =
   List.map (Format.asprintf "%a" Interp_2.pp_env_or_value) env
 
 let string_list_of_heap heap =
@@ -25,8 +25,10 @@ let string_list_of_heap heap =
 
 let string_lists_of_steps steps =
   List.map
-    (fun (c, e, s) ->
-      (string_list_of_code c, string_list_of_env e, string_list_of_heap s))
+    (fun { code; stack; heap } ->
+      ( string_list_of_code code,
+        string_list_of_stack stack,
+        string_list_of_heap heap ))
     steps
 
 let apply_to_last f l =

@@ -1,5 +1,3 @@
-(* Using Int_map to represent memory *)
-
 type value
 and closure = code * env
 
@@ -31,8 +29,8 @@ and binding = Ast.var * value
 and env = binding list
 
 type env_or_value = EV of env | V of value
-type env_value_stack = env_or_value list
-type state = code * env_value_stack * value Heap.t
+type stack = env_or_value list
+type state = { code : code; stack : stack; heap : value Heap.t }
 
 val step : state -> state
 val compile : Ast.t -> code

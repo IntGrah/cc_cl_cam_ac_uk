@@ -54,79 +54,85 @@ and env = binding list [@@deriving show { with_path = false }]
 type env_or_value = EV of env | V of value
 [@@deriving show { with_path = false }]
 
-type env_value_stack = env_or_value list [@@deriving show { with_path = false }]
+type stack = env_or_value list [@@deriving show { with_path = false }]
 
-type state = code * env_value_stack * value Heap.t
+type state = { code : code; stack : stack; heap : value Heap.t }
 (** This is the the slang program state --- that is, values for references. It
     is an array of referenced values together with next unallocated address *)
 
 (* Printing *)
 
-let pp_state fmt ((c, evs, s) : state) =
+let pp_state fmt { code; stack; heap } =
   Format.fprintf fmt
     "@[<v>Code Stack:@;<1 2>%a@;Env/Value Stack:@;<1 2>%a@;Heap:@;<1 2>%a@;@]"
-    pp_code c pp_env_value_stack evs (Heap.pp pp_value) s
+    pp_code code pp_stack stack (Heap.pp pp_value) heap
 
 (* The "MACHINE" *)
 
-let rec search x : env_value_stack -> value = function
+let rec search x : stack -> value = function
   | [] -> Errors.complainf "%s is not defined!" x
   | V _ :: rest -> search x rest
   | EV env :: rest -> (
       match List.assoc_opt x env with None -> search x rest | Some v -> v)
 
-let rec evs_to_env : env_value_stack -> env = function
+let rec evs_to_env : stack -> env = function
   | [] -> []
   | V _ :: rest -> evs_to_env rest
   | EV env :: rest -> env @ evs_to_env rest
 
 (** val step : (code * env_value_stack * state) -> (code * env_value_stack *
     state) *)
-let step : state -> state = function
-  | PUSH v :: ds, evs, s -> (ds, V v :: evs, s)
-  | POP :: ds, _ :: evs, s -> (ds, evs, s)
-  | SWAP :: ds, e1 :: e2 :: evs, s -> (ds, e2 :: e1 :: evs, s)
-  | BIND x :: ds, V v :: evs, s -> (ds, EV [ (x, v) ] :: evs, s)
-  | LOOKUP x :: ds, evs, s -> (ds, V (search x evs) :: evs, s)
-  | UNARY op :: ds, V v :: evs, s -> (ds, V (Ast.Unary_op.to_fun op v) :: evs, s)
-  | OPER op :: ds, V v2 :: V v1 :: evs, s ->
-      (ds, V (Ast.Binary_op.to_fun op (v1, v2)) :: evs, s)
-  | MK_PAIR :: ds, V v2 :: V v1 :: evs, s -> (ds, V (Pair (v1, v2)) :: evs, s)
-  | FST :: ds, V (Pair (v, _)) :: evs, s -> (ds, V v :: evs, s)
-  | SND :: ds, V (Pair (_, v)) :: evs, s -> (ds, V v :: evs, s)
-  | MK_INL :: ds, V v :: evs, s -> (ds, V (Inl v) :: evs, s)
-  | MK_INR :: ds, V v :: evs, s -> (ds, V (Inr v) :: evs, s)
-  | CASE (c1, _) :: ds, V (Inl v) :: evs, s -> (c1 @ ds, V v :: evs, s)
-  | CASE (_, c2) :: ds, V (Inr v) :: evs, s -> (c2 @ ds, V v :: evs, s)
-  | TEST (c1, _) :: ds, V (Bool true) :: evs, s -> (c1 @ ds, evs, s)
-  | TEST (_, c2) :: ds, V (Bool false) :: evs, s -> (c2 @ ds, evs, s)
-  | ASSIGN :: ds, V v :: V (Ref a) :: evs, s ->
-      (ds, V Unit :: evs, Heap.set a v s)
-  | DEREF :: ds, V (Ref a) :: evs, s -> (ds, V (Heap.get a s) :: evs, s)
-  | MK_REF :: ds, V v :: evs, s ->
-      let a, s' = Heap.alloc v s in
-      (ds, V (Ref a) :: evs, s')
-  | WHILE (_, _) :: ds, V (Bool false) :: evs, s -> (ds, V Unit :: evs, s)
-  | WHILE (c1, c2) :: ds, V (Bool true) :: evs, s ->
-      (c2 @ [ POP ] @ c1 @ [ WHILE (c1, c2) ] @ ds, evs, s)
-  | MK_CLOSURE c :: ds, evs, s ->
-      (ds, V (Fun (Closure (c, evs_to_env evs))) :: evs, s)
-  | MK_REC (f, c) :: ds, evs, s ->
-      (ds, V (Fun (Rec_closure (f, (c, evs_to_env evs)))) :: evs, s)
-  | APPLY :: ds, V (Fun (Closure (c, env))) :: V v :: evs, s ->
-      (c @ ds, V v :: EV env :: evs, s)
-  | APPLY :: ds, V (Fun (Rec_closure (f, (c, env)))) :: V v :: evs, s ->
-      ( APPLY :: ds,
-        V (Fun (Closure (c, (f, Fun (Rec_closure (f, (c, env)))) :: env)))
-        :: V v :: evs,
-        s )
-  | state -> Errors.complainf "step : bad state = %a" pp_state state
+let step state =
+  let advance code stack = { state with code; stack } in
+  match (state.code, state.stack) with
+  | PUSH v :: ds, stack -> advance ds (V v :: stack)
+  | POP :: ds, _ :: stack -> advance ds stack
+  | SWAP :: ds, e1 :: e2 :: stack -> advance ds (e2 :: e1 :: stack)
+  | BIND x :: ds, V v :: stack -> advance ds (EV [ (x, v) ] :: stack)
+  | LOOKUP x :: ds, stack -> advance ds (V (search x stack) :: stack)
+  | UNARY op :: ds, V v :: stack ->
+      advance ds (V (Ast.Unary_op.to_fun op v) :: stack)
+  | OPER op :: ds, V v2 :: V v1 :: stack ->
+      advance ds (V (Ast.Binary_op.to_fun op (v1, v2)) :: stack)
+  | MK_PAIR :: ds, V v2 :: V v1 :: stack ->
+      advance ds (V (Pair (v1, v2)) :: stack)
+  | FST :: ds, V (Pair (v, _)) :: stack -> advance ds (V v :: stack)
+  | SND :: ds, V (Pair (_, v)) :: stack -> advance ds (V v :: stack)
+  | MK_INL :: ds, V v :: stack -> advance ds (V (Inl v) :: stack)
+  | MK_INR :: ds, V v :: stack -> advance ds (V (Inr v) :: stack)
+  | CASE (c1, _) :: ds, V (Inl v) :: stack -> advance (c1 @ ds) (V v :: stack)
+  | CASE (_, c2) :: ds, V (Inr v) :: stack -> advance (c2 @ ds) (V v :: stack)
+  | TEST (c1, _) :: ds, V (Bool true) :: stack -> advance (c1 @ ds) stack
+  | TEST (_, c2) :: ds, V (Bool false) :: stack -> advance (c2 @ ds) stack
+  | ASSIGN :: ds, V v :: V (Ref a) :: stack ->
+      { code = ds; stack = V Unit :: stack; heap = Heap.set a v state.heap }
+  | DEREF :: ds, V (Ref a) :: stack ->
+      advance ds (V (Heap.get a state.heap) :: stack)
+  | MK_REF :: ds, V v :: stack ->
+      let a, heap = Heap.alloc v state.heap in
+      { code = ds; stack = V (Ref a) :: stack; heap }
+  | WHILE (_, _) :: ds, V (Bool false) :: stack -> advance ds (V Unit :: stack)
+  | WHILE (c1, c2) :: ds, V (Bool true) :: stack ->
+      advance (c2 @ [ POP ] @ c1 @ [ WHILE (c1, c2) ] @ ds) stack
+  | MK_CLOSURE c :: ds, stack ->
+      advance ds (V (Fun (Closure (c, evs_to_env stack))) :: stack)
+  | MK_REC (f, c) :: ds, stack ->
+      advance ds (V (Fun (Rec_closure (f, (c, evs_to_env stack)))) :: stack)
+  | APPLY :: ds, V (Fun (Closure (c, env))) :: V v :: stack ->
+      advance (c @ ds) (V v :: EV env :: stack)
+  | APPLY :: ds, V (Fun (Rec_closure (f, (c, env)))) :: V v :: stack ->
+      advance ds
+        (V (Fun (Closure (c, (f, Fun (Rec_closure (f, (c, env)))) :: env)))
+        :: V v :: stack)
+  | _ -> Errors.complainf "step : bad state = %a" pp_state state
 
 let rec driver n state =
   if Option.verbose then
     Format.printf "State %d: %a@." n pp_state state;
 
-  match state with [], [ V v ], _ -> v | _ -> driver (n + 1) (step state)
+  match (state.code, state.stack) with
+  | [], [ V v ] -> v
+  | _ -> driver (n + 1) (step state)
 
 (* A BIND will leave an env on stack.
    This gets rid of it.  *)
@@ -181,4 +187,4 @@ let interpret (e : Ast.t) : value =
     Format.printf "Compile code =@\n%a@." pp_code c;
 
   (* The initial Slang state is the Slang state : all locations contain 0 *)
-  driver 1 (c, [], Heap.empty)
+  driver 1 { code = c; stack = []; heap = Heap.empty }
