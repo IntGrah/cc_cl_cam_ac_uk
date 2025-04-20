@@ -77,11 +77,11 @@ type vm_state = {
   stack : stack_item array;
   heap : heap_item array;
   code : instruction array;
-  mutable sp : stack_index; (* stack pointer *)
-  mutable fp : stack_index; (* frame pointer *)
-  mutable cp : code_index; (* code pointer  *)
-  mutable hp : heap_index; (* next free     *)
-  mutable status : status_code;
+  sp : stack_index; (* stack pointer *)
+  fp : stack_index; (* frame pointer *)
+  cp : code_index; (* code pointer *)
+  hp : heap_index; (* next free *)
+  status : status_code;
 }
 
 let stack_top vm = vm.stack.(vm.sp - 1)
