@@ -156,74 +156,56 @@ let pp_state code fmt ({ cp; stack; _ } as state : state) =
 
 let step code ({ cp; stack; next_heap_address; heap } as state : state) : state
     =
+  let advance = { state with cp = cp + 1 } in
   match (code.(cp), stack) with
-  | PUSH v, evs -> { state with cp = cp + 1; stack = V v :: evs }
-  | POP, _ :: evs -> { state with cp = cp + 1; stack = evs }
+  | PUSH v, evs -> { advance with stack = V v :: evs }
+  | POP, _ :: evs -> { advance with stack = evs }
   | SWAP, s1 :: s2 :: evs -> { state with cp = cp + 1; stack = s2 :: s1 :: evs }
-  | BIND x, V v :: evs ->
-      { state with cp = cp + 1; stack = EV [ (x, v) ] :: evs }
-  | LOOKUP x, evs -> { state with cp = cp + 1; stack = V (search x evs) :: evs }
+  | BIND x, V v :: evs -> { advance with stack = EV [ (x, v) ] :: evs }
+  | LOOKUP x, evs -> { advance with stack = V (search x evs) :: evs }
   | UNARY op, V v :: evs ->
       { state with cp = cp + 1; stack = V (Ast.Unary_op.to_fun op v) :: evs }
   | OPER op, V v2 :: V v1 :: evs ->
-      {
-        state with
-        cp = cp + 1;
-        stack = V (Ast.Binary_op.to_fun op (v1, v2)) :: evs;
-      }
+      { advance with stack = V (Ast.Binary_op.to_fun op (v1, v2)) :: evs }
   | MK_PAIR, V v2 :: V v1 :: evs ->
-      { state with cp = cp + 1; stack = V (Pair (v1, v2)) :: evs }
-  | FST, V (Pair (v, _)) :: evs ->
-      { state with cp = cp + 1; stack = V v :: evs }
-  | SND, V (Pair (_, v)) :: evs ->
-      { state with cp = cp + 1; stack = V v :: evs }
-  | MK_INL, V v :: evs -> { state with cp = cp + 1; stack = V (Inl v) :: evs }
-  | MK_INR, V v :: evs -> { state with cp = cp + 1; stack = V (Inr v) :: evs }
-  | CASE (_, Some _), V (Inl v) :: evs ->
-      { state with cp = cp + 1; stack = V v :: evs }
+      { advance with stack = V (Pair (v1, v2)) :: evs }
+  | FST, V (Pair (v, _)) :: evs -> { advance with stack = V v :: evs }
+  | SND, V (Pair (_, v)) :: evs -> { advance with stack = V v :: evs }
+  | MK_INL, V v :: evs -> { advance with stack = V (Inl v) :: evs }
+  | MK_INR, V v :: evs -> { advance with stack = V (Inr v) :: evs }
+  | CASE (_, Some _), V (Inl v) :: evs -> { advance with stack = V v :: evs }
   | CASE (_, Some i), V (Inr v) :: evs ->
-      { state with cp = i; stack = V v :: evs }
-  | TEST (_, Some _), V (Bool true) :: evs ->
-      { state with cp = cp + 1; stack = evs }
+      { advance with cp = i; stack = V v :: evs }
+  | TEST (_, Some _), V (Bool true) :: evs -> { advance with stack = evs }
   | TEST (_, Some i), V (Bool false) :: evs ->
-      { state with cp = i; stack = evs }
+      { advance with cp = i; stack = evs }
   | ASSIGN, V v :: V (Ref a) :: evs ->
-      {
-        state with
-        cp = cp + 1;
-        stack = V Unit :: evs;
-        heap = Int_map.add a v heap;
-      }
+      { advance with stack = V Unit :: evs; heap = Int_map.add a v heap }
   | DEREF, V (Ref a) :: evs ->
-      { state with cp = cp + 1; stack = V (Int_map.find a heap) :: evs }
+      { advance with stack = V (Int_map.find a heap) :: evs }
   | MK_REF, V v :: evs ->
       {
-        cp = cp + 1;
+        advance with
         stack = V (Ref next_heap_address) :: evs;
         next_heap_address = next_heap_address + 1;
         heap = Int_map.add next_heap_address v heap;
       }
   | MK_CLOSURE loc, evs ->
-      {
-        state with
-        cp = cp + 1;
-        stack = V (Fun (Closure (loc, evs_to_env evs))) :: evs;
-      }
+      { advance with stack = V (Fun (Closure (loc, evs_to_env evs))) :: evs }
   | MK_REC (f, loc), evs ->
       {
-        state with
-        cp = cp + 1;
+        advance with
         stack =
           V (Fun (Closure (loc, (f, Fun (Rec_closure loc)) :: evs_to_env evs)))
           :: evs;
       }
   | APPLY, V (Fun (Closure ((_, Some i), env))) :: V v :: evs ->
       { state with cp = i; stack = V v :: EV env :: RA (cp + 1) :: evs }
-  (* new intructions *)
+  (* new instructions *)
   | RETURN, V v :: _ :: RA i :: evs -> { state with cp = i; stack = V v :: evs }
-  | LABEL _, evs -> { state with cp = cp + 1; stack = evs }
-  | HALT, evs -> { state with cp; stack = evs }
-  | GOTO (_, Some i), evs -> { state with cp = i; stack = evs }
+  | LABEL _, _ -> advance
+  | HALT, _ -> state
+  | GOTO (_, Some i), _ -> { state with cp = i }
   | _ -> Errors.complainf "step : bad state = %a\n" (pp_state code) state
 
 (* COMPILE *)
@@ -371,12 +353,12 @@ let compile e =
     (* body of program @ stop the interpreter @ function definitions *)
     c @ (HALT :: defs)
   in
-  (* the function definitions *)
+
   if Option.verbose then
     Format.printf "Compiled Code = %a@." pp_code result;
   result
 
-(* put code listing into an array, associate an array index to each label *)
+(** put code listing into an array, associate an array index to each label *)
 let load l =
   (* insert array index for each label *)
   let apply_label_map_to_instruction m = function
