@@ -11,7 +11,7 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
     code of Interp_0.interpret. *)
 
 type value = f Value.t
-and f = Rec_closure of closure | Closure of closure
+and f = Rec_closure of Ast.var * closure | Closure of closure
 and closure = Ast.var * Ast.t * env
 
 and continuation_action =
@@ -43,7 +43,8 @@ let rec pp_value fmt = Value.pp pp_fun fmt
 
 and pp_fun fmt = function
   | Closure clo -> Format.fprintf fmt "Closure(%a)" pp_closure clo
-  | Rec_closure clo -> Format.fprintf fmt "Rec_closure(%a)" pp_closure clo
+  | Rec_closure (f, clo) ->
+      Format.fprintf fmt "Rec_closure(%s, %a)" f pp_closure clo
 
 and pp_closure fmt (var, e, env) =
   Format.fprintf fmt "%s, %a, %a" var Ast.pp e pp_env env
@@ -74,7 +75,7 @@ let mk_fun (x, body, env) : value =
 let mk_rec_fun (f, x, body, env) : value =
   let fvars = Free_vars.free_vars [ f; x ] body in
   let smaller_env = filter_env fvars env in
-  Fun (Closure (x, body, (f, Fun (Rec_closure (x, body, []))) :: smaller_env))
+  Fun (Rec_closure (f, (x, body, smaller_env)))
 
 (** for a recursive function [f] we want
     [lookup (env, f) = FUN(true, (x, body, env))] *)
@@ -83,11 +84,7 @@ let lookup x env : value =
     | [] -> Errors.complainf "%s is not defined!" x
     | (y, v) :: rest ->
         if x = y then
-          match v with
-          | Fun (Rec_closure (z, body, _)) ->
-              Fun
-                (Closure (z, body, (y, Fun (Rec_closure (z, body, []))) :: rest))
-          | _ -> v
+          v
         else
           aux rest
   in
@@ -207,8 +204,8 @@ let step = function
       INSPECT (e2, env, OPER (op, v1) :: k)
   | COMPUTE (APPLY v2 :: k, Fun (Closure (x, body, env))) ->
       INSPECT (body, update (x, v2) env, k)
-  | COMPUTE (APPLY v2 :: k, Fun (Rec_closure (x, body, env))) ->
-      INSPECT (body, update (x, v2) env, k)
+  | COMPUTE (APPLY v2 :: k, (Fun (Rec_closure (f, (x, body, env))) as clo)) ->
+      COMPUTE (APPLY v2 :: k, Fun (Closure (x, body, (f, clo) :: env)))
   | COMPUTE (ARG (e2, env) :: k, v) -> INSPECT (e2, env, APPLY v :: k)
   | COMPUTE (PAIR_FST (e2, env) :: k, v1) -> INSPECT (e2, env, MKPAIR v1 :: k)
   | COMPUTE (CASE (x1, e1, _, _, env) :: k, Inl v) ->
@@ -223,11 +220,11 @@ let step = function
   | COMPUTE (TAIL (el, env) :: k, _) -> INSPECT (Seq el, env, k)
   | state -> Errors.complainf "step : malformed state = %a@." pp_state state
 
-let rec driver n state =
-  if Option.verbose then
-    Format.printf "state %d =@.%a@." n pp_state state;
-  match state with COMPUTE ([], v) -> v | _ -> driver (n + 1) (step state)
+let interpret (e : Ast.t) : value =
+  let rec driver n state =
+    if Option.verbose then
+      Format.printf "state %d =@.%a@." n pp_state state;
+    match state with COMPUTE ([], v) -> v | _ -> driver (n + 1) (step state)
+  in
 
-let eval e env = driver 1 (INSPECT (e, env, []))
-let env_empty : env = []
-let interpret (e : Ast.t) : value = eval e env_empty
+  driver 1 (INSPECT (e, [], []))

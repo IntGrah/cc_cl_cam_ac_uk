@@ -26,7 +26,7 @@ type address = int
 type var = string
 
 type value = f Value.t
-and f = Closure of code * env | Rec_closure of code
+and f = Closure of closure | Rec_closure of Ast.var * closure
 and closure = code * env
 
 and instruction =
@@ -77,9 +77,11 @@ let pp_list fmt sep f l =
 let rec pp_value fmt = Value.pp pp_fun fmt
 
 and pp_fun fmt = function
-  | Closure (c, env) ->
-      Format.fprintf fmt "CLOSURE(%a, %a)" pp_code c pp_env env
-  | Rec_closure c -> Format.fprintf fmt "REC_CLOSURE(%a)" pp_code c
+  | Closure clo -> Format.fprintf fmt "CLOSURE(%a)" pp_closure clo
+  | Rec_closure (f, clo) ->
+      Format.fprintf fmt "REC_CLOSURE(%s, %a)" f pp_closure clo
+
+and pp_closure fmt (c, env) = Format.fprintf fmt "%a, %a" pp_code c pp_env env
 
 and pp_env fmt =
   Format.pp_print_list
@@ -151,48 +153,20 @@ let assign (heap, i) a v =
   let heap = IntMap.add a v heap in
   (heap, i)
 
-let mk_fun (c, env) : value = Fun (Closure (c, env))
-
-let mk_rec (f, c, env) : value =
-  Fun (Closure (c, (f, Fun (Rec_closure c)) :: env))
-
-(*
-   in interp_0:
-
-   interpret(LetRecFun(f, (x, body), e), env) =
-       let rec new_env g =
-           if g = f then FUN (fun v -> interpret(body, update(new_env, (x, v)))) else env g
-       in interpret(e, new_env, store)
-
-      new_env x = env x
-      new_env f = FUN (fun v -> interpret(body, update(new_env, (x, v))))
-
-      lookup (env1 @ [(f, cl1)] @ evn2, f) =
-        CLOSURE (false, (x, body, (f, cl2) :: env2))
-*)
-let rec lookup_opt x : env -> value option = function
-  | [] -> None
-  | (y, Fun (Rec_closure body)) :: rest when x = y ->
-      Some (mk_rec (x, body, rest))
-  | (y, v) :: _ when x = y -> Some v
-  | _ :: rest -> lookup_opt x rest
-
-let rec search x evs : value =
-  match evs with
-  | [] -> Errors.complainf "%s is not defined!\n" x
+let rec search x : env_value_stack -> value = function
+  | [] -> Errors.complainf "%s is not defined!" x
   | V _ :: rest -> search x rest
   | EV env :: rest -> (
-      match lookup_opt x env with None -> search x rest | Some v -> v)
+      match List.assoc_opt x env with None -> search x rest | Some v -> v)
 
-let rec evs_to_env = function
+let rec evs_to_env : env_value_stack -> env = function
   | [] -> []
   | V _ :: rest -> evs_to_env rest
   | EV env :: rest -> env @ evs_to_env rest
 
-(** val step : interp_state -> interp_state = (code * env_value_stack * state)
-    -> (code * env_value_stack * state) *)
+(** val step : (code * env_value_stack * state) -> (code * env_value_stack *
+    state) *)
 let step : interp_state -> interp_state = function
-  (* (code stack, value/env stack, state) -> (code stack, value/env stack, state) *)
   | PUSH v :: ds, evs, s -> (ds, V v :: evs, s)
   | POP :: ds, _ :: evs, s -> (ds, evs, s)
   | SWAP :: ds, e1 :: e2 :: evs, s -> (ds, e2 :: e1 :: evs, s)
@@ -218,27 +192,29 @@ let step : interp_state -> interp_state = function
   | WHILE (_, _) :: ds, V (Bool false) :: evs, s -> (ds, V Unit :: evs, s)
   | WHILE (c1, c2) :: ds, V (Bool true) :: evs, s ->
       (c2 @ [ POP ] @ c1 @ [ WHILE (c1, c2) ] @ ds, evs, s)
-  | MK_CLOSURE c :: ds, evs, s -> (ds, V (mk_fun (c, evs_to_env evs)) :: evs, s)
+  | MK_CLOSURE c :: ds, evs, s ->
+      (ds, V (Fun (Closure (c, evs_to_env evs))) :: evs, s)
   | MK_REC (f, c) :: ds, evs, s ->
-      (ds, V (mk_rec (f, c, evs_to_env evs)) :: evs, s)
+      (ds, V (Fun (Rec_closure (f, (c, evs_to_env evs)))) :: evs, s)
   | APPLY :: ds, V (Fun (Closure (c, env))) :: V v :: evs, s ->
       (c @ ds, V v :: EV env :: evs, s)
-  | state -> Errors.complainf "step : bad state = %a\n" pp_interp_state state
+  | APPLY :: ds, V (Fun (Rec_closure (f, (c, env)))) :: V v :: evs, s ->
+      ( APPLY :: ds,
+        V (Fun (Closure (c, (f, Fun (Rec_closure (f, (c, env)))) :: env)))
+        :: V v :: evs,
+        s )
+  | state -> Errors.complainf "step : bad state = %a" pp_interp_state state
 
 let rec driver n state =
-  let () =
-    if Option.verbose then
-      Format.printf "\nState %d : %a@." n pp_interp_state state
-  in
+  if Option.verbose then
+    Format.printf "State %d: %a@." n pp_interp_state state;
+
   match state with [], [ V v ], _ -> v | _ -> driver (n + 1) (step state)
 
 (* A BIND will leave an env on stack.
    This gets rid of it.  *)
 let leave_scope = [ SWAP; POP ]
 
-(*
-   val compile : Ast.t -> code
-*)
 let rec compile : Ast.t -> code = function
   | Unit -> [ PUSH Unit ]
   | Integer n -> [ PUSH (Int n) ]
@@ -282,13 +258,13 @@ let rec compile : Ast.t -> code = function
       (MK_REC (f, (BIND x :: compile body) @ leave_scope) :: BIND f :: compile e)
       @ leave_scope
 
-(* The initial Slang state is the Slang state : all locations contain 0 *)
-let initial_state = (IntMap.empty, 0)
-let initial_env = []
-
-(* interpret : expr -> (value * state) *)
-let interpret e =
+let interpret (e : Ast.t) : value =
   let c = compile e in
   if Option.verbose then
     Format.printf "Compile code =@\n%a@." pp_code c;
+
+  (* The initial Slang state is the Slang state : all locations contain 0 *)
+  let initial_env = [] in
+  let initial_state = (IntMap.empty, 0) in
+
   driver 1 (c, initial_env, initial_state)

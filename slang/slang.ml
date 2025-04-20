@@ -10,7 +10,7 @@ open Slanglib
 (*  This is the main file. *)
 
 let error file action s =
-  print_string ("\nERROR in " ^ file ^ " with " ^ action ^ " : " ^ s ^ "\n")
+  Format.printf "ERROR in %s with %s : %s\n" file action s
 
 let fatal_error file action s =
   error file action s;
@@ -49,7 +49,9 @@ let i3 (file, e) =
     "Interpreter 3"
 
 let i4 (file, e) =
-  wrap file e (fun x -> Jargon.string_of_value (Jargon.interpret x)) "Jargon VM"
+  wrap file e
+    (fun x -> Format.asprintf "%a" Jargon.pp_value (Jargon.interpret x))
+    "Jargon VM"
 
 let i4x86 (_, e) =
   let _ = Jargon_to_x86.emit_x86 e in
@@ -57,15 +59,15 @@ let i4x86 (_, e) =
 
 (* show compiled code *)
 let i2cc (_, e) =
-  let () = Format.printf "%a" Interp_2.pp_code (Interp_2.compile e) in
+  Format.printf "%a" Interp_2.pp_code (Interp_2.compile e);
   None
 
 let i3cc (_, e) =
-  let () = Format.printf "%a" Interp_3.pp_code (Interp_3.compile e) in
+  Format.printf "%a" Interp_3.pp_code (Interp_3.compile e);
   None
 
 let i4cc (_, e) =
-  let () = print_endline (Jargon.string_of_listing (Jargon.compile e)) in
+  Format.printf "%a" Jargon.pp_listing (Jargon.compile e);
   None
 
 let interpreters =
@@ -118,10 +120,8 @@ let process_input (file, expected) =
     run_interpreters file e expected interpreters
   with Errors.Error s -> error file "Front_end" s
 
-let process_inputs = List.iter process_input
-
 let () =
-  process_inputs
+  List.iter process_input
     (if Option.run_tests then
        try Tests.get_all_tests ()
        with Errors.Error s -> fatal_error "tests/" "Test.get_all_tests" s

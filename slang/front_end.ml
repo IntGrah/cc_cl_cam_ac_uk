@@ -1,11 +1,11 @@
 let parse_error filename (lexbuf : Lexing.lexbuf) =
   let pos = lexbuf.lex_curr_p in
-  let line = string_of_int pos.pos_lnum in
-  let pos = string_of_int (pos.pos_cnum - pos.pos_bol + 1) in
-  Errors.complainf "ERROR in %s with %s : %s@." filename "parsing"
-    ("at line " ^ line ^ " position " ^ pos)
+  let line = pos.pos_lnum in
+  let pos = pos.pos_cnum - pos.pos_bol + 1 in
+  Errors.complainf "ERROR in %s with parsing : at line %d position %d@."
+    filename line pos
 
-(* Parse input file *)
+(** Parse input file *)
 let parse file lexbuf =
   let e =
     try Parser.start Lexer.token lexbuf
@@ -18,7 +18,7 @@ let parse file lexbuf =
       Format.printf "Parsed result:@.%a" Past.pp e;
   e
 
-(* Perform static checks and translate from Past to Ast *)
+(** Perform static checks and translate from Past to Ast *)
 let check filename e =
   let e' =
     try Static.translate e
@@ -34,7 +34,7 @@ let check filename e =
 
   e'
 
-(* The front end *)
+(** The front end *)
 let front_end filename =
   let in_chan =
     try open_in filename

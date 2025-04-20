@@ -10,7 +10,7 @@ let rec driver state =
 
 let steps e =
   let c = Interp_2.compile e in
-  driver (c, Interp_2.initial_env, Interp_2.initial_state)
+  driver (c, [], (IntMap.empty, 0))
 
 let string_list_of_code code =
   List.map (Format.asprintf "%a" Interp_2.pp_instruction) code

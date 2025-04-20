@@ -85,15 +85,14 @@ val comp :
 val compile : Ast.t -> listing
 val run : listing -> vm_state
 val interpret : Ast.t -> vm_state
-val string_of_listing : listing -> string
-val string_of_stack_item : stack_item -> string
-val string_of_status : status_code -> string
-val string_of_heap_item : heap_item -> string
-val string_of_heap_type : heap_type -> string
-val string_of_instruction : instruction -> string
-val string_of_value : vm_state -> string
-val string_of_location : location -> string
-val string_of_value_path : value_path -> string
-val reset : unit -> unit
+val pp_stack_item : Format.formatter -> stack_item -> unit
+val pp_heap_item : Format.formatter -> heap_item -> unit
+val pp_status : Format.formatter -> status_code -> unit
+val pp_instruction : Format.formatter -> instruction -> unit
+val initial_state : listing -> vm_state
 val first_frame : vm_state -> vm_state
-val initial_state : instruction list -> vm_state
+val pp_location : Format.formatter -> location -> unit
+val pp_value_path : Format.formatter -> value_path -> unit
+val pp_value : Format.formatter -> vm_state -> unit
+val reset : unit -> unit
+val pp_listing : Format.formatter -> listing -> unit

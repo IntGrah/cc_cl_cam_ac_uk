@@ -41,8 +41,6 @@ type env_value_stack = env_or_value list
 type state = value IntMap.t * int
 type interp_state = code * env_value_stack * state
 
-val initial_state : state
-val initial_env : env_value_stack
 val step : interp_state -> interp_state
 val compile : Ast.t -> code
 val interpret : Ast.t -> value

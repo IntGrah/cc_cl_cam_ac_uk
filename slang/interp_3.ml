@@ -159,11 +159,6 @@ let pp_env_value_stack fmt = pp_list fmt ";@\n " pp_env_or_value
 
 (* THE MACHINE *)
 
-let incr (next_address : address ref) : address =
-  let a = !next_address in
-  next_address := a + 1;
-  a
-
 let pp_heap fmt { next_heap_address; heap; _ } : unit =
   let rec aux fmt k =
     if k < next_heap_address then

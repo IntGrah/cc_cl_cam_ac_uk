@@ -119,8 +119,8 @@ let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
   | Case (e, (x1, e1), (x2, e2)) -> (
       let v, store = interp e env store in
       match v with
-      | Inl v' -> interp e1 (update (x1, v') env) store
-      | Inr v' -> interp e2 (update (x2, v') env) store
+      | Inl v1 -> interp e1 (update (x1, v1) env) store
+      | Inr v2 -> interp e2 (update (x2, v2) env) store
       | _ -> Errors.complain "Runtime error: expecting inl or inr")
   | Lambda (x, e) -> (Fun (Run (fun v -> interp e (update (x, v) env))), store)
   | App (e1, e2) -> (
@@ -137,8 +137,8 @@ let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
       in
       interp e env store
   | LetRecFun (f, (x, body), e) ->
+      (* A recursive environment! *)
       let rec new_env g : value =
-        (* A recursive environment! *)
         if g = f then
           Fun (Run (fun v -> interp body (update (x, v) new_env)))
         else
@@ -146,9 +146,8 @@ let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
       in
       interp e new_env store
 
-let empty_env : env = fun var -> Errors.complainf "%s is not defined" var
-let empty_store : store = fun ad -> Errors.complainf "%d is not allocated" ad
-
 let interpret (e : Ast.t) : value =
+  let empty_env : env = Errors.complainf "%s is not defined" in
+  let empty_store : store = Errors.complainf "%d is not allocated" in
   let v, _ = interp e empty_env empty_store in
   v

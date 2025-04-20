@@ -80,157 +80,137 @@ let stack_top vm = Array.get vm.stack (vm.sp - 1)
 
 (********************** Printing ********************************)
 
-let string_of_status = function
-  | Halted -> "halted"
-  | Running -> "running"
-  | CodeIndexOutOfBound -> "code index out-of-bound"
-  | StackIndexOutOfBound -> "stack index out-of-bound"
-  | HeapIndexOutOfBound -> "heap index out-of-bound"
-  | StackUnderflow -> "stack underflow"
+let pp_status fmt = function
+  | Halted -> Format.fprintf fmt "Halted"
+  | Running -> Format.fprintf fmt "Running"
+  | CodeIndexOutOfBound -> Format.fprintf fmt "CodeIndexOutOfBound"
+  | StackIndexOutOfBound -> Format.fprintf fmt "StackIndexOutOfBound"
+  | HeapIndexOutOfBound -> Format.fprintf fmt "HeapIndexOutOfBound"
+  | StackUnderflow -> Format.fprintf fmt "StackUnderflow"
 
-let string_of_stack_item = function
-  | STACK_INT i -> "STACK_INT " ^ string_of_int i
-  | STACK_BOOL true -> "STACK_BOOL true"
-  | STACK_BOOL false -> "STACK_BOOL false"
-  | STACK_UNIT -> "STACK_UNIT"
-  | STACK_HI i -> "STACK_HI " ^ string_of_int i
-  | STACK_RA i -> "STACK_RA " ^ string_of_int i
-  | STACK_FP i -> "STACK_FP " ^ string_of_int i
+let pp_stack_item fmt = function
+  | STACK_INT i -> Format.fprintf fmt "STACK_INT %d" i
+  | STACK_BOOL true -> Format.fprintf fmt "STACK_BOOL true"
+  | STACK_BOOL false -> Format.fprintf fmt "STACK_BOOL false"
+  | STACK_UNIT -> Format.fprintf fmt "STACK_UNIT"
+  | STACK_HI i -> Format.fprintf fmt "STACK_HI %d" i
+  | STACK_RA i -> Format.fprintf fmt "STACK_RA %d" i
+  | STACK_FP i -> Format.fprintf fmt "STACK_FP %d" i
 
-let string_of_heap_type = function
-  | HT_PAIR -> "HT_PAIR"
-  | HT_INL -> "HT_INL"
-  | HT_INR -> "HT_INR"
-  | HT_CLOSURE -> "HT_CLOSURE"
+let pp_heap_type fmt = function
+  | HT_PAIR -> Format.fprintf fmt "HT_PAIR"
+  | HT_INL -> Format.fprintf fmt "HT_INL"
+  | HT_INR -> Format.fprintf fmt "HT_INR"
+  | HT_CLOSURE -> Format.fprintf fmt "HT_CLOSURE"
 
-let string_of_heap_item = function
-  | HEAP_INT i -> "HEAP_INT " ^ string_of_int i
-  | HEAP_BOOL true -> "HEAP_BOOL true"
-  | HEAP_BOOL false -> "HEAP_BOOL false"
-  | HEAP_UNIT -> "HEAP_UNIT"
-  | HEAP_HI i -> "HEAP_HI " ^ string_of_int i
-  | HEAP_CI i -> "HEAP_CI " ^ string_of_int i
+let pp_heap_item fmt = function
+  | HEAP_INT i -> Format.fprintf fmt "HEAP_INT %d" i
+  | HEAP_BOOL true -> Format.fprintf fmt "HEAP_BOOL true"
+  | HEAP_BOOL false -> Format.fprintf fmt "HEAP_BOOL false"
+  | HEAP_UNIT -> Format.fprintf fmt "HEAP_UNIT"
+  | HEAP_HI i -> Format.fprintf fmt "HEAP_HI %d" i
+  | HEAP_CI i -> Format.fprintf fmt "HEAP_CI %d" i
   | HEAP_HEADER (i, t) ->
-      "HEAP_HEADER(" ^ string_of_int i ^ ", " ^ string_of_heap_type t ^ ")"
+      Format.fprintf fmt "HEAP_HEADER(%d, %a)" i pp_heap_type t
 
-let string_of_value_path = function
-  | STACK_LOCATION offset -> "STACK_LOCATION " ^ string_of_int offset
-  | HEAP_LOCATION offset -> "HEAP_LOCATION " ^ string_of_int offset
+let pp_value_path fmt = function
+  | STACK_LOCATION offset -> Format.fprintf fmt "STACK_LOCATION %d" offset
+  | HEAP_LOCATION offset -> Format.fprintf fmt "HEAP_LOCATION %d" offset
 
-let string_of_location = function
-  | l, None -> l
-  | l, Some i -> l ^ " = " ^ string_of_int i
+let pp_location fmt = function
+  | l, None -> Format.fprintf fmt "%s" l
+  | l, Some i -> Format.fprintf fmt "%s = %d" l i
 
-let string_of_instruction = function
-  | UNARY op -> "UNARY " ^ Ast.Unary_op.to_string op
-  | OPER op -> "OPER " ^ Ast.Binary_op.to_string op
-  | MK_PAIR -> "MK_PAIR"
-  | FST -> "FST"
-  | SND -> "SND"
-  | MK_INL -> "MK_INL"
-  | MK_INR -> "MK_INR"
-  | MK_REF -> "MK_REF"
-  | PUSH v -> "PUSH " ^ string_of_stack_item v
-  | LOOKUP p -> "LOOKUP " ^ string_of_value_path p
-  | TEST l -> "TEST " ^ string_of_location l
-  | CASE l -> "CASE " ^ string_of_location l
-  | GOTO l -> "GOTO " ^ string_of_location l
-  | APPLY -> "APPLY"
-  | RETURN -> "RETURN"
-  | HALT -> "HALT"
-  | LABEL l -> "LABEL " ^ l
-  | SWAP -> "SWAP"
-  | POP -> "POP"
-  | DEREF -> "DEREF"
-  | ASSIGN -> "ASSIGN"
+let pp_instruction fmt = function
+  | UNARY op -> Format.fprintf fmt "UNARY %s" (Ast.Unary_op.to_string op)
+  | OPER op -> Format.fprintf fmt "OPER %s" (Ast.Binary_op.to_string op)
+  | MK_PAIR -> Format.fprintf fmt "MK_PAIR"
+  | FST -> Format.fprintf fmt "FST"
+  | SND -> Format.fprintf fmt "SND"
+  | MK_INL -> Format.fprintf fmt "MK_INL"
+  | MK_INR -> Format.fprintf fmt "MK_INR"
+  | MK_REF -> Format.fprintf fmt "MK_REF"
+  | PUSH v -> Format.fprintf fmt "PUSH %a" pp_stack_item v
+  | LOOKUP p -> Format.fprintf fmt "LOOKUP %a" pp_value_path p
+  | TEST l -> Format.fprintf fmt "TEST %a" pp_location l
+  | CASE l -> Format.fprintf fmt "CASE %a" pp_location l
+  | GOTO l -> Format.fprintf fmt "GOTO %a" pp_location l
+  | APPLY -> Format.fprintf fmt "APPLY"
+  | RETURN -> Format.fprintf fmt "RETURN"
+  | HALT -> Format.fprintf fmt "HALT"
+  | LABEL l -> Format.fprintf fmt "LABEL %s" l
+  | SWAP -> Format.fprintf fmt "SWAP"
+  | POP -> Format.fprintf fmt "POP"
+  | DEREF -> Format.fprintf fmt "DEREF"
+  | ASSIGN -> Format.fprintf fmt "ASSIGN"
   | MK_CLOSURE (loc, n) ->
-      "MK_CLOSURE(" ^ string_of_location loc ^ ", " ^ string_of_int n ^ ")"
+      Format.fprintf fmt "MK_CLOSURE(%a, %d)" pp_location loc n
 
-let rec string_of_listing = function
-  | [] -> "\n"
-  | LABEL l :: rest -> "\n" ^ l ^ " :" ^ string_of_listing rest
-  | i :: rest -> "\n\t" ^ string_of_instruction i ^ string_of_listing rest
+let rec pp_listing fmt = function
+  | [] -> Format.fprintf fmt "\n"
+  | LABEL l :: rest -> Format.fprintf fmt "\n%s: %a" l pp_listing rest
+  | i :: rest -> Format.fprintf fmt "\n\t%a%a" pp_instruction i pp_listing rest
 
-let string_of_installed_code (code, size) =
-  let rec aux k =
+let pp_installed_code fmt (code, size) =
+  let rec aux fmt k =
     if size = k then
-      ""
+      Format.fprintf fmt ""
     else
-      string_of_int k ^ ": "
-      ^ string_of_instruction code.(k)
-      ^ "\n"
-      ^ aux (k + 1)
+      Format.fprintf fmt "%d: %a\n%a" k pp_instruction code.(k) aux (k + 1)
   in
-  aux 0
+  aux fmt 0
 
-let string_of_stack (sp, stack) =
-  let rec aux carry j =
-    if j = sp then
-      carry
-    else
-      aux
-        (string_of_int j ^ ": "
-        ^ string_of_stack_item (Array.get stack j)
-        ^ "\n" ^ carry)
-        (j + 1)
+let pp_stack fmt (sp, stack) =
+  let rec aux fmt j =
+    if j < sp then
+      Format.fprintf fmt "%d: %a\n%a" j pp_stack_item stack.(j) aux (j + 1)
   in
-  aux "" 0
+  aux fmt 0
 
-let string_of_heap vm =
-  let rec aux k =
-    if vm.hp <= k then
-      ""
-    else
-      string_of_int k ^ " -> "
-      ^ string_of_heap_item vm.heap.(k)
-      ^ "\n"
-      ^ aux (k + 1)
+let pp_heap fmt vm =
+  let rec aux fmt k =
+    if k < vm.hp then
+      Format.fprintf fmt "%d -> %a\n%a" k pp_heap_item vm.heap.(k) aux (k + 1)
   in
-  "\nHeap = \n" ^ aux 0
+  Format.fprintf fmt "Heap = \n%a" aux 0
 
-let string_of_state vm =
-  "cp = " ^ string_of_int vm.cp ^ " -> "
-  ^ string_of_instruction (get_instruction vm)
-  ^ "\n" ^ "fp = " ^ string_of_int vm.fp ^ "\n" ^ "Stack = \n"
-  ^ string_of_stack (vm.sp, vm.stack)
-  ^
-  if vm.hp = 0 then
-    ""
-  else
-    string_of_heap vm
+let pp_state fmt vm =
+  Format.fprintf fmt "cp = %d -> %a\nfp = %d\nStack = \n%a@.%a" vm.cp
+    pp_instruction (get_instruction vm) vm.fp pp_stack (vm.sp, vm.stack) pp_heap
+    vm
 
 (* the following two functions are needed to
    pretty-print heap and stack values
 *)
-let rec string_of_heap_value a vm =
+let rec pp_heap_value a fmt vm =
   match Array.get vm.heap a with
-  | HEAP_INT i -> string_of_int i
-  | HEAP_BOOL true -> "true"
-  | HEAP_BOOL false -> "false"
-  | HEAP_UNIT -> "()"
-  | HEAP_HI i -> string_of_heap_value i vm
+  | HEAP_INT i -> Format.fprintf fmt "%d" i
+  | HEAP_BOOL true -> Format.fprintf fmt "true"
+  | HEAP_BOOL false -> Format.fprintf fmt "false"
+  | HEAP_UNIT -> Format.fprintf fmt "()"
+  | HEAP_HI i -> Format.fprintf fmt "%a" (pp_heap_value i) vm
   | HEAP_CI _ ->
       Errors.complain
         "string_of_heap_value: expecting value in heap, found code index"
   | HEAP_HEADER (_, ht) -> (
       match ht with
       | HT_PAIR ->
-          "("
-          ^ string_of_heap_value (a + 1) vm
-          ^ ", "
-          ^ string_of_heap_value (a + 2) vm
-          ^ ")"
-      | HT_INL -> "inl(" ^ string_of_heap_value (a + 1) vm ^ ")"
-      | HT_INR -> "inr(" ^ string_of_heap_value (a + 1) vm ^ ")"
-      | HT_CLOSURE -> "CLOSURE")
+          Format.fprintf fmt "(%a, %a)"
+            (pp_heap_value (a + 1))
+            vm
+            (pp_heap_value (a + 2))
+            vm
+      | HT_INL -> Format.fprintf fmt "inl(%a)" (pp_heap_value (a + 1)) vm
+      | HT_INR -> Format.fprintf fmt "inr(%a)" (pp_heap_value (a + 1)) vm
+      | HT_CLOSURE -> Format.fprintf fmt "CLOSURE")
 
-let string_of_value vm =
+let pp_value fmt vm =
   match stack_top vm with
-  | STACK_INT i -> string_of_int i
-  | STACK_BOOL true -> "true"
-  | STACK_BOOL false -> "false"
-  | STACK_UNIT -> "()"
-  | STACK_HI a -> string_of_heap_value a vm
+  | STACK_INT i -> Format.fprintf fmt "%d" i
+  | STACK_BOOL true -> Format.fprintf fmt "true"
+  | STACK_BOOL false -> Format.fprintf fmt "false"
+  | STACK_UNIT -> Format.fprintf fmt "()"
+  | STACK_HI a -> Format.fprintf fmt "%a" (pp_heap_value a) vm
   | STACK_RA _ ->
       Errors.complain
         "string_of_value: expecting value on stack top, found code index"
@@ -522,16 +502,14 @@ let step vm =
   | GOTO (_, Some i) -> goto (i, vm)
   | TEST (_, Some i) -> test (i, vm)
   | CASE (_, Some i) -> case (i, vm)
-  | _ -> Errors.complain ("step : bad state = " ^ string_of_state vm ^ "\n")
+  | _ -> Errors.complainf "step : bad state = %a" pp_state vm
 
 (* DRIVER *)
 
 let rec driver n vm =
   let _ =
     if Option.verbose then
-      print_string
-        ("========== state " ^ string_of_int n ^ " ==========\n"
-       ^ string_of_state vm ^ "\n")
+      Format.printf "========== state %d ==========@.%a@." n pp_state vm
   in
   if vm.status = Running then
     driver (n + 1) (step vm)
@@ -575,9 +553,8 @@ let initial_state l =
   let code_array, c_bound = load l in
   let _ =
     if Option.verbose then
-      print_string
-        ("\nInstalled Code = \n"
-        ^ string_of_installed_code (code_array, c_bound))
+      Format.printf "Installed Code = \n%a" pp_installed_code
+        (code_array, c_bound)
   in
   {
     stack_bound = Option.stack_max;
@@ -602,8 +579,7 @@ let run l =
   let vm = driver 1 (first_frame (initial_state l)) in
   match vm.status with
   | Halted -> vm
-  | status ->
-      Errors.complain ("run : stopped wth status " ^ string_of_status status)
+  | status -> Errors.complainf "run : stopped wth status %a" pp_status status
 
 (* COMPILE *)
 
@@ -763,13 +739,13 @@ and comp_lambda vmap (f_opt, x, e) =
 let compile e =
   let defs, c = comp [] e in
   let result =
-    c (* body of program *) @ [ HALT ] (* stop the interpreter *) @ defs
+    (* body of program @ stop the interpreter @ function definitions *)
+    c @ [ HALT ] @ defs
   in
-  (* the function definitions *)
-  let _ =
-    if Option.verbose then
-      print_string ("\nCompiled Code = \n" ^ string_of_listing result)
-  in
+
+  if Option.verbose then
+    Format.printf "Compiled Code = \n%a" pp_listing result;
+
   result
 
 let interpret e = run (compile e)
