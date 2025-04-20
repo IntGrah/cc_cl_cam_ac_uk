@@ -1,18 +1,22 @@
-type code_index = int
-type stack_index = int
-type heap_index = int
-type static_distance = int
-type offset = int
-type label = string
+type code_index = int [@@deriving show]
+type stack_index = int [@@deriving show]
+type heap_index = int [@@deriving show]
+type offset = int [@@deriving show]
+type label = string [@@deriving show]
 type location = label * code_index option
+
+let pp_location fmt : location -> unit = function
+  | l, None -> Format.fprintf fmt "%s" l
+  | l, Some i -> Format.fprintf fmt "%s = %d" l i
 
 type status_code =
   | Halted
   | Running
-  | CodeIndexOutOfBound
-  | StackIndexOutOfBound
-  | HeapIndexOutOfBound
-  | StackUnderflow
+  | Code_index_out_of_bounds
+  | Stack_index_out_of_bounds
+  | Heap_index_out_of_bounds
+  | Stack_underflow
+[@@deriving show { with_path = false }]
 
 type stack_item =
   | STACK_INT of int
@@ -21,8 +25,10 @@ type stack_item =
   | STACK_HI of heap_index (* Pointer into Heap *)
   | STACK_RA of code_index (* return address *)
   | STACK_FP of stack_index (* Frame pointer *)
+[@@deriving show { with_path = false }]
 
 type heap_type = HT_PAIR | HT_INL | HT_INR | HT_CLOSURE
+[@@deriving show { with_path = false }]
 
 type heap_item =
   | HEAP_INT of int
@@ -31,8 +37,10 @@ type heap_item =
   | HEAP_HI of heap_index (* Pointer into Heap *)
   | HEAP_CI of code_index (* Code pointer for closures *)
   | HEAP_HEADER of int * heap_type (* int is number of items to follow *)
+[@@deriving show { with_path = false }]
 
 type value_path = STACK_LOCATION of offset | HEAP_LOCATION of offset
+[@@deriving show { with_path = false }]
 
 type instruction =
   | PUSH of stack_item (* modified *)
@@ -58,6 +66,7 @@ type instruction =
   | GOTO of location
   | LABEL of label
   | HALT
+[@@deriving show { with_path = false }]
 
 type listing = instruction list
 
@@ -75,87 +84,18 @@ type vm_state = {
   mutable status : status_code;
 }
 
-let get_instruction vm = Array.get vm.code vm.cp
-let stack_top vm = Array.get vm.stack (vm.sp - 1)
+let stack_top vm = vm.stack.(vm.sp - 1)
 
 (********************** Printing ********************************)
 
-let pp_status fmt = function
-  | Halted -> Format.fprintf fmt "Halted"
-  | Running -> Format.fprintf fmt "Running"
-  | CodeIndexOutOfBound -> Format.fprintf fmt "CodeIndexOutOfBound"
-  | StackIndexOutOfBound -> Format.fprintf fmt "StackIndexOutOfBound"
-  | HeapIndexOutOfBound -> Format.fprintf fmt "HeapIndexOutOfBound"
-  | StackUnderflow -> Format.fprintf fmt "StackUnderflow"
-
-let pp_stack_item fmt = function
-  | STACK_INT i -> Format.fprintf fmt "STACK_INT %d" i
-  | STACK_BOOL true -> Format.fprintf fmt "STACK_BOOL true"
-  | STACK_BOOL false -> Format.fprintf fmt "STACK_BOOL false"
-  | STACK_UNIT -> Format.fprintf fmt "STACK_UNIT"
-  | STACK_HI i -> Format.fprintf fmt "STACK_HI %d" i
-  | STACK_RA i -> Format.fprintf fmt "STACK_RA %d" i
-  | STACK_FP i -> Format.fprintf fmt "STACK_FP %d" i
-
-let pp_heap_type fmt = function
-  | HT_PAIR -> Format.fprintf fmt "HT_PAIR"
-  | HT_INL -> Format.fprintf fmt "HT_INL"
-  | HT_INR -> Format.fprintf fmt "HT_INR"
-  | HT_CLOSURE -> Format.fprintf fmt "HT_CLOSURE"
-
-let pp_heap_item fmt = function
-  | HEAP_INT i -> Format.fprintf fmt "HEAP_INT %d" i
-  | HEAP_BOOL true -> Format.fprintf fmt "HEAP_BOOL true"
-  | HEAP_BOOL false -> Format.fprintf fmt "HEAP_BOOL false"
-  | HEAP_UNIT -> Format.fprintf fmt "HEAP_UNIT"
-  | HEAP_HI i -> Format.fprintf fmt "HEAP_HI %d" i
-  | HEAP_CI i -> Format.fprintf fmt "HEAP_CI %d" i
-  | HEAP_HEADER (i, t) ->
-      Format.fprintf fmt "HEAP_HEADER(%d, %a)" i pp_heap_type t
-
-let pp_value_path fmt = function
-  | STACK_LOCATION offset -> Format.fprintf fmt "STACK_LOCATION %d" offset
-  | HEAP_LOCATION offset -> Format.fprintf fmt "HEAP_LOCATION %d" offset
-
-let pp_location fmt = function
-  | l, None -> Format.fprintf fmt "%s" l
-  | l, Some i -> Format.fprintf fmt "%s = %d" l i
-
-let pp_instruction fmt = function
-  | UNARY op -> Format.fprintf fmt "UNARY %a" Ast.Unary_op.pp op
-  | OPER op -> Format.fprintf fmt "OPER %a" Ast.Binary_op.pp op
-  | MK_PAIR -> Format.fprintf fmt "MK_PAIR"
-  | FST -> Format.fprintf fmt "FST"
-  | SND -> Format.fprintf fmt "SND"
-  | MK_INL -> Format.fprintf fmt "MK_INL"
-  | MK_INR -> Format.fprintf fmt "MK_INR"
-  | MK_REF -> Format.fprintf fmt "MK_REF"
-  | PUSH v -> Format.fprintf fmt "PUSH %a" pp_stack_item v
-  | LOOKUP p -> Format.fprintf fmt "LOOKUP %a" pp_value_path p
-  | TEST l -> Format.fprintf fmt "TEST %a" pp_location l
-  | CASE l -> Format.fprintf fmt "CASE %a" pp_location l
-  | GOTO l -> Format.fprintf fmt "GOTO %a" pp_location l
-  | APPLY -> Format.fprintf fmt "APPLY"
-  | RETURN -> Format.fprintf fmt "RETURN"
-  | HALT -> Format.fprintf fmt "HALT"
-  | LABEL l -> Format.fprintf fmt "LABEL %s" l
-  | SWAP -> Format.fprintf fmt "SWAP"
-  | POP -> Format.fprintf fmt "POP"
-  | DEREF -> Format.fprintf fmt "DEREF"
-  | ASSIGN -> Format.fprintf fmt "ASSIGN"
-  | MK_CLOSURE (loc, n) ->
-      Format.fprintf fmt "MK_CLOSURE(%a, %d)" pp_location loc n
-
-let rec pp_listing fmt = function
+let rec pp_listing fmt : listing -> unit = function
   | [] -> Format.fprintf fmt "\n"
   | LABEL l :: rest -> Format.fprintf fmt "\n%s: %a" l pp_listing rest
   | i :: rest -> Format.fprintf fmt "\n\t%a%a" pp_instruction i pp_listing rest
 
 let pp_installed_code fmt (code, size) =
   let rec aux fmt k =
-    if size = k then
-      Format.fprintf fmt ""
-    else
+    if k < size then
       Format.fprintf fmt "%d: %a\n%a" k pp_instruction code.(k) aux (k + 1)
   in
   aux fmt 0
@@ -172,18 +112,26 @@ let pp_heap fmt vm =
     if k < vm.hp then
       Format.fprintf fmt "%d -> %a\n%a" k pp_heap_item vm.heap.(k) aux (k + 1)
   in
-  Format.fprintf fmt "Heap = \n%a" aux 0
+  aux fmt 0
 
 let pp_state fmt vm =
-  Format.fprintf fmt "cp = %d -> %a\nfp = %d\nStack = \n%a@.%a" vm.cp
-    pp_instruction (get_instruction vm) vm.fp pp_stack (vm.sp, vm.stack) pp_heap
-    vm
+  Format.fprintf fmt
+    "@[<v>Code Pointer:@\n\
+     <1 2>%d -> %a@\n\
+     Frame Pointer:@\n\
+     <1 2>%d@\n\
+     Stack:@\n\
+     <1 2>%a@\n\
+     Heap:@\n\
+     <1 2>%a@]"
+    vm.cp pp_instruction vm.code.(vm.cp) vm.fp pp_stack (vm.sp, vm.stack)
+    pp_heap vm
 
 (* the following two functions are needed to
    pretty-print heap and stack values
 *)
 let rec pp_heap_value a fmt vm =
-  match Array.get vm.heap a with
+  match vm.heap.(a) with
   | HEAP_INT i -> Format.fprintf fmt "%d" i
   | HEAP_BOOL true -> Format.fprintf fmt "true"
   | HEAP_BOOL false -> Format.fprintf fmt "false"
@@ -247,7 +195,7 @@ let advance_cp vm =
   if vm.cp < vm.code_bound then
     { vm with cp = vm.cp + 1 }
   else
-    { vm with status = CodeIndexOutOfBound }
+    { vm with status = Code_index_out_of_bounds }
 
 let goto (i, vm) = { vm with cp = i }
 
@@ -256,7 +204,7 @@ let pop (n, vm) =
   if 0 <= vm.sp - n then
     { vm with sp = vm.sp - n }
   else
-    { vm with status = StackUnderflow }
+    { vm with status = Stack_underflow }
 
 let pop_top vm =
   let c = stack_top vm in
@@ -268,7 +216,7 @@ let push (c, vm) =
     let _ = Array.set vm.stack vm.sp c in
     { vm with sp = vm.sp + 1 }
   else
-    { vm with status = StackIndexOutOfBound }
+    { vm with status = Stack_index_out_of_bounds }
 
 let swap vm =
   let c1, vm1 = pop_top vm in
@@ -280,8 +228,7 @@ let do_unary : Ast.Unary_op.t * stack_item -> stack_item = function
   | Neg, STACK_INT m -> STACK_INT (-m)
   | Read, STACK_UNIT -> STACK_INT (readint ())
   | op, _ ->
-      Errors.complain
-        ("do_unary: malformed unary operator: " ^ Ast.Unary_op.to_string op)
+      Errors.complainf "do_unary: malformed operator: %a" Ast.Unary_op.pp op
 
 let do_oper : Ast.Binary_op.t * stack_item * stack_item -> stack_item = function
   | And, STACK_BOOL m, STACK_BOOL n -> STACK_BOOL (m && n)
@@ -294,8 +241,7 @@ let do_oper : Ast.Binary_op.t * stack_item * stack_item -> stack_item = function
   | Mul, STACK_INT m, STACK_INT n -> STACK_INT (m * n)
   | Div, STACK_INT m, STACK_INT n -> STACK_INT (m / n)
   | op, _, _ ->
-      Errors.complainf "do_oper: malformed binary operator: %a" Ast.Binary_op.pp
-        op
+      Errors.complainf "do_oper: malformed operator: %a" Ast.Binary_op.pp op
 
 let perform_op (op, vm) =
   let v_right, vm1 = pop_top vm in
@@ -401,7 +347,7 @@ let mk_ref vm =
 let deref vm =
   let v, vm1 = pop_top vm in
   match v with
-  | STACK_HI a -> push (heap_to_stack_item (Array.get vm1.heap a), vm1)
+  | STACK_HI a -> push (heap_to_stack_item vm1.heap.(a), vm1)
   | _ -> Errors.complain "deref"
 
 let assign vm =
@@ -409,11 +355,11 @@ let assign vm =
   let c2, _ = pop_top vm1 in
   match c2 with
   | STACK_HI a ->
-      if vm.sp < vm.heap_bound then
-        let _ = Array.set vm.heap a (stack_to_heap_item c1) in
-        push (STACK_UNIT, vm)
+      if vm.sp < vm.heap_bound then (
+        vm.heap.(a) <- stack_to_heap_item c1;
+        push (STACK_UNIT, vm))
       else
-        { vm with status = HeapIndexOutOfBound }
+        { vm with status = Heap_index_out_of_bounds }
   | _ -> Errors.complain "assing: runtime error, expecting heap index on stack"
 
 let test (i, vm) =
@@ -446,17 +392,17 @@ let mk_closure = function
       let a, vm1 = allocate (2 + n, vm) in
       let header = HEAP_HEADER (2 + n, HT_CLOSURE) in
       let code_address = HEAP_CI i in
-      let _ = vm1.heap.(a) <- header in
-      let _ = vm1.heap.(a + 1) <- code_address in
+      vm1.heap.(a) <- header;
+      vm1.heap.(a + 1) <- code_address;
       let rec aux m =
         if m = n then
           ()
         else
           let v = stack_to_heap_item vm1.stack.(vm.sp - (m + 1)) in
-          let _ = vm1.heap.(a + m + 2) <- v in
+          vm1.heap.(a + m + 2) <- v;
           aux (m + 1)
       in
-      let _ = aux 0 in
+      aux 0;
       let vm2 = pop (n, vm1) in
       push (STACK_HI a, vm2)
   | (_, None), _, _ ->
@@ -479,7 +425,7 @@ let apply vm =
         "apply: runtime error, expecting heap index on top of stack"
 
 let step vm =
-  match get_instruction vm with
+  match vm.code.(vm.cp) with
   | UNARY op -> advance_cp (perform_unary (op, vm))
   | OPER op -> advance_cp (perform_op (op, vm))
   | MK_PAIR -> advance_cp (mk_pair vm)
@@ -507,10 +453,9 @@ let step vm =
 (* DRIVER *)
 
 let rec driver n vm =
-  let _ =
-    if Option.verbose then
-      Format.printf "========== state %d ==========@.%a@." n pp_state vm
-  in
+  if Option.verbose then
+    Format.printf "========== state %d ==========@.%a@." n pp_state vm;
+
   if vm.status = Running then
     driver (n + 1) (step vm)
   else
@@ -523,17 +468,13 @@ let map_instruction_labels f = function
   | MK_CLOSURE ((lab, _), n) -> MK_CLOSURE ((lab, Some (f lab)), n)
   | inst -> inst
 
-let rec find l y =
-  match l with
-  | [] -> Errors.complain ("Compile.find : " ^ y ^ " is not found")
-  | (x, v) :: rest ->
-      if x = y then
-        v
-      else
-        find rest y
+let find y vmap =
+  match List.assoc_opt y vmap with
+  | None -> Errors.complainf "Compile.find : %s is not found" y
+  | Some v -> v
 
 (* put code listing into an array, associate an array index to each label *)
-let load instr_list =
+let load (instr_list : listing) : instruction array * int =
   (* find array index for each label *)
   let mk_label_to_address l =
     let rec aux carry k = function
@@ -544,18 +485,19 @@ let load instr_list =
     aux [] 0 l
   in
   let label_to_address = mk_label_to_address instr_list in
-  let locate_instr = map_instruction_labels (find label_to_address) in
+  let locate_instr =
+    map_instruction_labels (fun x -> find x label_to_address)
+  in
   let located_instr_list = List.map locate_instr instr_list in
   let result = Array.of_list located_instr_list in
   (result, Array.length result)
 
 let initial_state l =
   let code_array, c_bound = load l in
-  let _ =
-    if Option.verbose then
-      Format.printf "Installed Code = \n%a" pp_installed_code
-        (code_array, c_bound)
-  in
+
+  if Option.verbose then
+    Format.printf "Installed Code = \n%a" pp_installed_code (code_array, c_bound);
+
   {
     stack_bound = Option.stack_max;
     heap_bound = Option.heap_max;
@@ -577,21 +519,20 @@ let first_frame vm =
 
 let run l =
   let vm = driver 1 (first_frame (initial_state l)) in
+
   match vm.status with
   | Halted -> vm
-  | status -> Errors.complainf "run : stopped wth status %a" pp_status status
+  | status ->
+      Errors.complainf "run : stopped wth status %a" pp_status_code status
 
 (* COMPILE *)
 
 let label_ref = ref 0
 
-let new_label =
-  let get () =
-    let v = !label_ref in
-    label_ref := !label_ref + 1;
-    "L" ^ string_of_int v
-  in
-  get
+let new_label () =
+  let v = !label_ref in
+  label_ref := !label_ref + 1;
+  Format.sprintf "L%d" v
 
 (*
 
@@ -608,7 +549,7 @@ Interp 3
 
 Jargon VM :
 
-     [clsoure    ]
+     [closure    ]
      [arg        ]
         ...
 
@@ -711,7 +652,7 @@ let rec comp vmap : Ast.t -> listing * listing = function
       let defs1, c1 = comp vmap e1 in
       let defs2, c2 = comp vmap e2 in
       (defs1 @ defs2, c2 @ c1 @ [ APPLY ])
-  | Var x -> ([], [ LOOKUP (find vmap x) ])
+  | Var x -> ([], [ LOOKUP (find x vmap) ])
   | LetFun (f, (x, e1), e2) -> comp vmap (App (Lambda (f, e2), Lambda (x, e1)))
   | Lambda (x, e) -> comp_lambda vmap (None, x, e)
   | LetRecFun (f, (x, e1), e2) ->
@@ -727,7 +668,7 @@ and comp_lambda vmap (f_opt, x, e) =
   in
   let x_bind = (x, STACK_LOCATION (-2)) in
   let fvars = Free_vars.free_vars bound_vars e in
-  let fetch_fvars = List.map (fun y -> LOOKUP (find vmap y)) fvars in
+  let fetch_fvars = List.map (fun y -> LOOKUP (find y vmap)) fvars in
   let fvar_bind (y, p) = (y, HEAP_LOCATION p) in
   let env_bind = List.map fvar_bind (positions fvars) in
   let new_vmap = x_bind :: (f_bind @ env_bind @ vmap) in
@@ -749,4 +690,4 @@ let compile e =
   result
 
 let interpret e = run (compile e)
-let reset = fun _ -> label_ref := 0
+let reset = fun () -> label_ref := 0

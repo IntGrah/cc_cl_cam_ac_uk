@@ -350,7 +350,7 @@ let compile e =
      We arbitarily use the annotation from the root of the AST
    *)
   let result =
-    (* body of program @ stop the interpreter @ function definitions *)
+    (* Body of program @ stop the interpreter @ function definitions *)
     c @ (HALT :: defs)
   in
 
@@ -358,9 +358,9 @@ let compile e =
     Format.printf "Compiled Code = %a@." pp_code result;
   result
 
-(** put code listing into an array, associate an array index to each label *)
+(** Put code listing into an array, associate an array index to each label *)
 let load l =
-  (* insert array index for each label *)
+  (* Insert array index for each label *)
   let apply_label_map_to_instruction m = function
     | GOTO (lab, _) -> GOTO (lab, Some (List.assoc lab m))
     | TEST (lab, _) -> TEST (lab, Some (List.assoc lab m))
@@ -383,6 +383,7 @@ let load l =
 
 let interpret (e : Ast.t) : value =
   let c = compile e in
+
   if Option.verbose then
     Format.printf "Compiled code = %a@." pp_code c;
 
@@ -390,12 +391,13 @@ let interpret (e : Ast.t) : value =
 
   let rec driver (n : int) (code : instruction array) (state : state) : value =
     if Option.verbose then
-      Format.printf "State %d: %a@." n (pp_state code) state;
+      Format.printf "State %d: %a@\n" n (pp_state code) state;
     match (code.(state.cp), state.stack) with
     | HALT, [ V v ] -> v
     | HALT, _ ->
-        Errors.complainf "driver : bad halted state = %a\n" (pp_state code)
+        Errors.complainf "Driver: bad halted state = %a@\n" (pp_state code)
           state
     | _ -> driver (n + 1) code (step code state)
   in
+
   driver 0 c init_state

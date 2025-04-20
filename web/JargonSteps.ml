@@ -168,7 +168,7 @@ let string_lists_of_vm_state vm_state =
         fp;
         cp;
         hp;
-        status = Format.asprintf "%a" Jargon.pp_status status;
+        status = Format.asprintf "%a" Jargon.pp_status_code status;
       }
 
 let string_list_of_code vm_state =

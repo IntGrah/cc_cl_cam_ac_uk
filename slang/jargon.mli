@@ -1,7 +1,6 @@
 type code_index = int
 type stack_index = int
 type heap_index = int
-type static_distance = int
 type offset = int
 type label = string
 type location = label * code_index option
@@ -9,10 +8,10 @@ type location = label * code_index option
 type status_code =
   | Halted
   | Running
-  | CodeIndexOutOfBound
-  | StackIndexOutOfBound
-  | HeapIndexOutOfBound
-  | StackUnderflow
+  | Code_index_out_of_bounds
+  | Stack_index_out_of_bounds
+  | Heap_index_out_of_bounds
+  | Stack_underflow
 
 type stack_item =
   | STACK_INT of int
@@ -87,7 +86,7 @@ val run : listing -> vm_state
 val interpret : Ast.t -> vm_state
 val pp_stack_item : Format.formatter -> stack_item -> unit
 val pp_heap_item : Format.formatter -> heap_item -> unit
-val pp_status : Format.formatter -> status_code -> unit
+val pp_status_code : Format.formatter -> status_code -> unit
 val pp_instruction : Format.formatter -> instruction -> unit
 val initial_state : listing -> vm_state
 val first_frame : vm_state -> vm_state
