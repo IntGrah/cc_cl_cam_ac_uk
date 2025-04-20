@@ -38,9 +38,7 @@ A few comments on the code below:
 
 let emit_x86 e =
   (* strip ".slang" off of filename *)
-  let base_name =
-    String.sub Option.infile 0 (String.length Option.infile - 6)
-  in
+  let base_name = Filename.remove_extension Option.infile in
   let out_chan = open_out (base_name ^ ".s") in
   let tab c =
     output_string out_chan ("\t" ^ c ^ "\n")
@@ -294,7 +292,7 @@ let emit_x86 e =
     | PUSH (STACK_INT i) -> cmd ("pushq $" ^ string_of_int i) "push int \n"
     | PUSH (STACK_BOOL true) -> cmd "pushq $1" "push true \n"
     | PUSH (STACK_BOOL false) -> cmd "pushq $0" "push false \n"
-    | PUSH STACK_UNIT -> cmd "pushq $0" "push false \n"
+    | PUSH STACK_UNIT -> cmd "pushq $0" "push unit \n"
     | PUSH (STACK_HI _) ->
         Errors.complain
           "Internal Error : Jargon code never explicitly pushes stack pointer"

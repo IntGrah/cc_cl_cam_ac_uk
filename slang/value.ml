@@ -1,5 +1,5 @@
 type 'f t =
-  | Ref of int
+  | Ref of Heap.address
   | Int of int
   | Bool of bool
   | Unit
@@ -11,7 +11,7 @@ type 'f t =
 open Format
 
 let rec pp pp_fun ppf = function
-  | Ref a -> fprintf ppf "Ref(%d)" a
+  | Ref a -> fprintf ppf "Ref(%a)" Heap.pp_address a
   | Bool b -> fprintf ppf "%b" b
   | Int n -> fprintf ppf "%d" n
   | Unit -> fprintf ppf "()"

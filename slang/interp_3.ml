@@ -60,18 +60,9 @@ type env_or_value =
 [@@deriving show { with_path = false }]
 
 type env_value_stack = env_or_value list [@@deriving show { with_path = false }]
+type state = { heap : value Heap.t; cp : int; stack : env_value_stack }
 
-module Int_map = Map.Make (Int)
-
-type state = {
-  next_heap_address : address;
-  heap : value Int_map.t;
-  cp : int;
-  stack : env_value_stack;
-}
-
-let init_state =
-  { next_heap_address = 0; heap = Int_map.empty; cp = 0; stack = [] }
+let init_state = { heap = Heap.empty; cp = 0; stack = [] }
 
 let rec lookup x : env -> value option = function
   | [] -> None
@@ -142,20 +133,11 @@ and pp_code fmt code =
 
 (* THE MACHINE *)
 
-let pp_heap fmt { next_heap_address; heap; _ } : unit =
-  let rec aux fmt k =
-    if k < next_heap_address then
-      Format.fprintf fmt "%d -> %a@.%a" k pp_value (Int_map.find k heap) aux
-        (k + 1)
-  in
-  aux fmt 0
-
-let pp_state code fmt ({ cp; stack; _ } as state : state) =
+let pp_state code fmt { cp; stack; heap } =
   Format.fprintf fmt "Code Pointer = %d -> %a@.Stack = %a@.Heap = %a@." cp
-    pp_instruction code.(cp) pp_env_value_stack stack pp_heap state
+    pp_instruction code.(cp) pp_env_value_stack stack (Heap.pp pp_value) heap
 
-let step code ({ cp; stack; next_heap_address; heap } as state : state) : state
-    =
+let step code ({ cp; stack; heap } as state : state) : state =
   let advance = { state with cp = cp + 1 } in
   match (code.(cp), stack) with
   | PUSH v, evs -> { advance with stack = V v :: evs }
@@ -180,16 +162,12 @@ let step code ({ cp; stack; next_heap_address; heap } as state : state) : state
   | TEST (_, Some i), V (Bool false) :: evs ->
       { advance with cp = i; stack = evs }
   | ASSIGN, V v :: V (Ref a) :: evs ->
-      { advance with stack = V Unit :: evs; heap = Int_map.add a v heap }
+      { advance with stack = V Unit :: evs; heap = Heap.set a v heap }
   | DEREF, V (Ref a) :: evs ->
-      { advance with stack = V (Int_map.find a heap) :: evs }
+      { advance with stack = V (Heap.get a heap) :: evs }
   | MK_REF, V v :: evs ->
-      {
-        advance with
-        stack = V (Ref next_heap_address) :: evs;
-        next_heap_address = next_heap_address + 1;
-        heap = Int_map.add next_heap_address v heap;
-      }
+      let a, heap = Heap.alloc v heap in
+      { advance with stack = V (Ref a) :: evs; heap }
   | MK_CLOSURE loc, evs ->
       { advance with stack = V (Fun (Closure (loc, evs_to_env evs))) :: evs }
   | MK_REC (f, loc), evs ->

@@ -1,7 +1,7 @@
 open Slanglib
 open Interp_2
 
-type 'a steps = Interp_2.interp_state list
+type 'a steps = Interp_2.state list
 
 let rec driver state =
   match state with
@@ -10,7 +10,7 @@ let rec driver state =
 
 let steps e =
   let c = Interp_2.compile e in
-  driver (c, [], (Int_map.empty, 0))
+  driver (c, [], Heap.empty)
 
 let string_list_of_code code =
   List.map (Format.asprintf "%a" Interp_2.pp_instruction) code
@@ -18,11 +18,10 @@ let string_list_of_code code =
 let string_list_of_env env =
   List.map (Format.asprintf "%a" Interp_2.pp_env_or_value) env
 
-let list_of_map m =
-  List.of_seq @@ Seq.map (fun (_, v) -> v) @@ Interp_2.Int_map.to_seq m
-
-let string_list_of_heap (heap, _) =
-  List.map (Format.asprintf "%a" Interp_2.pp_value) (list_of_map heap)
+let string_list_of_heap heap =
+  List.map
+    (Format.asprintf "%a" (Heap.pp_binding Interp_2.pp_value))
+    (Heap.to_list heap)
 
 let string_lists_of_steps steps =
   List.map

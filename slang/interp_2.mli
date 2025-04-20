@@ -1,7 +1,4 @@
 (* Using Int_map to represent memory *)
-module Int_map : Map.S with type key = int
-
-type address = int
 
 type value
 and closure = code * env
@@ -35,12 +32,9 @@ and env = binding list
 
 type env_or_value = EV of env | V of value
 type env_value_stack = env_or_value list
+type state = code * env_value_stack * value Heap.t
 
-(* array of referenced values together with next unallocated address *)
-type state = value Int_map.t * int
-type interp_state = code * env_value_stack * state
-
-val step : interp_state -> interp_state
+val step : state -> state
 val compile : Ast.t -> code
 val interpret : Ast.t -> value
 val pp_instruction : Format.formatter -> instruction -> unit

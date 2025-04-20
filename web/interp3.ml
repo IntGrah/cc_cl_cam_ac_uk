@@ -6,7 +6,7 @@ let string_state (cp, evs, heap_list) =
     List.map (Format.asprintf "%a" Interp_3.pp_value) heap_list )
 
 let rec driver n code (state : Interp_3.state) =
-  let heapl = Interp_3.Int_map.to_list state.heap in
+  let heapl = Heap.to_list state.heap in
   (state.cp, state.stack, heapl)
   ::
   (if Interp_3.HALT = code.(state.cp) then

@@ -13,6 +13,7 @@
   Type
   Errors
   Free_vars
+  Heap
   Interp_0
   Interp_1
   Interp_2

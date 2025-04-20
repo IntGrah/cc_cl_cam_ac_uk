@@ -24,15 +24,9 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
     has passed static analysis, then such "run time" errors should never happen!
     (Can you prove that?) *)
 
-type address = int
-
 type value = f Value.t
-
-and f =
-  | Run of (value -> store -> value * store)
-      [@printer fun fmt _ -> Format.fprintf fmt "Function(...)"]
-
-and store = address -> value [@@deriving show { with_path = false }]
+and f = Run of (value -> store -> value * store)
+and store = value Heap.t [@@deriving show { with_path = false }]
 
 type env = Ast.var -> value
 
@@ -44,13 +38,6 @@ let update (x, v) env =
     v
   else
     env y
-
-let new_address =
-  let next_address = ref 0 in
-  fun () ->
-    let a = !next_address in
-    next_address := a + 1;
-    a
 
 let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
   match e with
@@ -71,18 +58,18 @@ let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
       | _ -> Errors.complain "Runtime error: expecting a boolean!")
   | Ref e ->
       let v, store = interp e env store in
-      let a = new_address () in
-      (Ref a, update (a, v) store)
+      let a, store = Heap.alloc v store in
+      (Ref a, store)
   | Deref e -> (
       let v, store = interp e env store in
       match v with
-      | Ref a -> (store a, store)
+      | Ref a -> (Heap.get a store, store)
       | _ -> Errors.complain "Runtime error: expecting an address!")
   | Assign (e1, e2) -> (
       match interp e1 env store with
       | Ref a, store ->
           let v, store = interp e2 env store in
-          (Unit, update (a, v) store)
+          (Unit, Heap.set a v store)
       | _ ->
           Errors.complain
             "Runtime error: expecting an address on left side of assignment")
@@ -149,6 +136,5 @@ let rec interp (e : Ast.t) (env : env) (store : store) : value * store =
 
 let interpret (e : Ast.t) : value =
   let empty_env : env = Errors.complainf "%s is not defined" in
-  let empty_store : store = Errors.complainf "%d is not allocated" in
-  let v, _ = interp e empty_env empty_store in
+  let v, _ = interp e empty_env Heap.empty in
   v
