@@ -27,11 +27,12 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
 type address = int
 
 type value = f Value.t
-and f = Run of (value -> store -> value * store)
-and store = address -> value
 
-let rec pp_value fmt : value -> unit = Value.pp pp_fun fmt
-and pp_fun fmt _ = Format.fprintf fmt "Function(...)"
+and f =
+  | Run of (value -> store -> value * store)
+      [@printer fun fmt _ -> Format.fprintf fmt "Function(...)"]
+
+and store = address -> value [@@deriving show { with_path = false }]
 
 type env = Ast.var -> value
 

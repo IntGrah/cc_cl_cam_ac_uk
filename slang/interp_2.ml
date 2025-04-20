@@ -20,10 +20,9 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
 
     --- Program variables contained in code. *)
 
-module IntMap = Map.Make (Int)
+module Int_map = Map.Make (Int)
 
 type address = int
-type var = string
 
 type value = f Value.t
 and f = Closure of closure | Rec_closure of Ast.var * closure
@@ -31,13 +30,13 @@ and closure = code * env
 
 and instruction =
   | PUSH of value
-  | LOOKUP of var
+  | LOOKUP of Ast.var
   | UNARY of Ast.Unary_op.t
   | OPER of Ast.Binary_op.t
   | ASSIGN
   | SWAP
   | POP
-  | BIND of var
+  | BIND of Ast.var
   | FST
   | SND
   | DEREF
@@ -47,110 +46,57 @@ and instruction =
   | MK_INR
   | MK_REF
   | MK_CLOSURE of code
-  | MK_REC of var * code
+  | MK_REC of Ast.var * code
   | TEST of code * code
   | CASE of code * code
   | WHILE of code * code
 
 and code = instruction list
 and binding = Ast.var * value
-and env = binding list
+and env = binding list [@@deriving show { with_path = false }]
 
 type env_or_value = EV of env | V of value
-type env_value_stack = env_or_value list
+[@@deriving show { with_path = false }]
+
+type env_value_stack = env_or_value list [@@deriving show { with_path = false }]
 
 (* This is the the slang program state --- that is, values for references *)
 (* It is an array of referenced values together with next unallocated address *)
-type state = value IntMap.t * int
+type state = value Int_map.t * int
 type interp_state = code * env_value_stack * state
 
 (* Printing *)
 
-let pp_list fmt sep f l =
-  let rec aux f fmt = function
-    | [] -> ()
-    | [ t ] -> f fmt t
-    | t :: rest -> Format.fprintf fmt "%a%(%)%a" f t sep (aux f) rest
-  in
-  Format.fprintf fmt "@[[%a]@]" (aux f) l
-
-let rec pp_value fmt = Value.pp pp_fun fmt
-
-and pp_fun fmt = function
-  | Closure clo -> Format.fprintf fmt "CLOSURE(%a)" pp_closure clo
-  | Rec_closure (f, clo) ->
-      Format.fprintf fmt "REC_CLOSURE(%s, %a)" f pp_closure clo
-
-and pp_closure fmt (c, env) = Format.fprintf fmt "%a, %a" pp_code c pp_env env
-
-and pp_env fmt =
-  Format.pp_print_list
-    ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
-    pp_binding fmt
-
-and pp_binding fmt (x, v) = Format.fprintf fmt "(%s, %a)" x pp_value v
-
-and pp_instruction fmt = function
-  | UNARY op -> Format.fprintf fmt "@[UNARY %a@]" Ast.Unary_op.pp op
-  | OPER op -> Format.fprintf fmt "@[OPER %a@]" Ast.Binary_op.pp op
-  | MK_PAIR -> Format.fprintf fmt "MK_PAIR"
-  | FST -> Format.fprintf fmt "FST"
-  | SND -> Format.fprintf fmt "SND"
-  | MK_INL -> Format.fprintf fmt "MK_INL"
-  | MK_INR -> Format.fprintf fmt "MK_INR"
-  | MK_REF -> Format.fprintf fmt "MK_REF"
-  | PUSH v -> Format.fprintf fmt "PUSH %a" pp_value v
-  | LOOKUP x -> Format.fprintf fmt "LOOKUP %s" x
-  | TEST (c1, c2) ->
-      Format.fprintf fmt "TEST(@[%a,@ %a)@]" pp_code c1 pp_code c2
-  | CASE (c1, c2) ->
-      Format.fprintf fmt "CASE(@[%a,@ %a)@]" pp_code c1 pp_code c2
-  | WHILE (c1, c2) ->
-      Format.fprintf fmt "WHILE(@[%a,@ %a)@]" pp_code c1 pp_code c2
-  | APPLY -> Format.fprintf fmt "APPLY"
-  | BIND x -> Format.fprintf fmt "BIND %s" x
-  | SWAP -> Format.fprintf fmt "SWAP"
-  | POP -> Format.fprintf fmt "POP"
-  | DEREF -> Format.fprintf fmt "DEREF"
-  | ASSIGN -> Format.fprintf fmt "ASSIGN"
-  | MK_CLOSURE c -> Format.fprintf fmt "MK_CLOSURE(%a)" pp_code c
-  | MK_REC (f, c) -> Format.fprintf fmt "MK_REC(@[%s, %a)@]" f pp_code c
-
-and pp_code fmt c = pp_list fmt ";@ " pp_instruction c
-
-let pp_env_or_value fmt = function
-  | EV env -> Format.fprintf fmt "EV %a" pp_env env
-  | V v -> Format.fprintf fmt "V %a" pp_value v
-
-let pp_env_value_stack fmt n = pp_list fmt ";@." pp_env_or_value n
-
-let pp_state fmt (heap, i) =
-  let rec aux fmt k =
-    if i > k then
-      Format.fprintf fmt "%d -> %a@\n%a" k pp_value (IntMap.find k heap) aux
-        (k + 1)
-  in
-  if i <> 0 then
-    Format.fprintf fmt "@\nHeap = @\n%a" aux 0
-
 let pp_interp_state fmt (c, evs, s) =
-  Format.fprintf fmt "@\nCode Stack = @\n%a@\nEnv/Value Stack = @\n%a%a" pp_code
-    c pp_env_value_stack evs pp_state s
+  let pp_heap fmt heap =
+    let pp_binding fmt (k, v) = Format.fprintf fmt "%d -> %a" k pp_value v in
+    Int_map.bindings heap |> List.iter (pp_binding fmt);
+    Format.fprintf fmt "@;"
+  in
+  Format.fprintf fmt
+    "@[<v>Code Stack:@;\
+     <1 2>%a@;\
+     Env/Value Stack:@;\
+     <1 2>%a@;\
+     Heap (%d items):@;\
+     <1 2>%a@;\
+     @]"
+    pp_code c pp_env_value_stack evs (snd s) pp_heap (fst s)
 
 (* The "MACHINE" *)
 
 (** allocate a new location in the heap and give it value v *)
 let allocate (heap, i) v =
   if i < Option.heap_max then
-    let heap = IntMap.add i v heap in
+    let heap = Int_map.add i v heap in
     (i, (heap, i + 1))
   else
     Errors.complain "runtime error: heap kaput"
 
-let deref (heap, _) a = IntMap.find a heap
+let deref (heap, _) a = Int_map.find a heap
 
 let assign (heap, i) a v =
-  let heap = IntMap.add a v heap in
+  let heap = Int_map.add a v heap in
   (heap, i)
 
 let rec search x : env_value_stack -> value = function
@@ -265,6 +211,6 @@ let interpret (e : Ast.t) : value =
 
   (* The initial Slang state is the Slang state : all locations contain 0 *)
   let initial_env = [] in
-  let initial_state = (IntMap.empty, 0) in
+  let initial_state = (Int_map.empty, 0) in
 
   driver 1 (c, initial_env, initial_state)

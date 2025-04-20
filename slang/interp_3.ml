@@ -17,9 +17,9 @@ Timothy G. Griffin (tgg22@cam.ac.uk)
 
     --- compiler elimnates WHILE construct *)
 
-type address = int
-type label = string
-type location = label * address option
+type address = int [@@deriving show]
+type label = string [@@deriving show]
+type location = label * address option [@@deriving show]
 
 type value = f Value.t
 and f = Closure of location * env | Rec_closure of location
@@ -51,14 +51,15 @@ and instruction =
   | HALT
 
 and binding = Ast.var * value
-and env = binding list
+and env = binding list [@@deriving show { with_path = false }]
 
 type env_or_value =
   | EV of env (* an environment on the run-time stack *)
   | V of value (* a value on the run-time stack *)
   | RA of address (* a return address on the run-time stack *)
+[@@deriving show { with_path = false }]
 
-type env_value_stack = env_or_value list
+type env_value_stack = env_or_value list [@@deriving show { with_path = false }]
 
 module Int_map = Map.Make (Int)
 
@@ -94,23 +95,12 @@ let rec evs_to_env = function
   | RA _ :: rest -> evs_to_env rest
   | EV env :: rest -> env @ evs_to_env rest
 
-let pp_list fmt sep f l =
-  let rec aux f fmt = function
-    | [] -> ()
-    | [ t ] -> f fmt t
-    | t :: rest -> Format.fprintf fmt "%a%(%)%a" f t sep (aux f) rest
-  in
-  Format.fprintf fmt "@[[%a]@]" (aux f) l
-
 let rec pp_value fmt : value -> unit = Value.pp pp_fun fmt
 
 and pp_fun fmt = function
   | Closure (loc, env) ->
       Format.fprintf fmt "(%a, %a)" pp_location loc pp_env env
   | Rec_closure _ -> Format.fprintf fmt ""
-
-and pp_env fmt env = pp_list fmt ",@\n " pp_binding env
-and pp_binding fmt (x, v) = Format.fprintf fmt "(%s, %a)" x pp_value v
 
 and pp_location fmt = function
   | l, None -> Format.fprintf fmt "%s" l
@@ -149,13 +139,6 @@ and pp_code fmt code =
     ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.")
     (fun fmt (i, c) -> Format.fprintf fmt "%d: %a" i pp_instruction c)
     fmt annotated_code
-
-let pp_env_or_value fmt = function
-  | EV env -> Format.fprintf fmt "EV %a" pp_env env
-  | V v -> Format.fprintf fmt "V %a" pp_value v
-  | RA i -> Format.fprintf fmt "RA %d" i
-
-let pp_env_value_stack fmt = pp_list fmt ";@\n " pp_env_or_value
 
 (* THE MACHINE *)
 

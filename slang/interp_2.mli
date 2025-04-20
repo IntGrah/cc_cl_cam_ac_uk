@@ -1,21 +1,20 @@
-(* Using IntMap to represent memory *)
-module IntMap : Map.S with type key = int
+(* Using Int_map to represent memory *)
+module Int_map : Map.S with type key = int
 
 type address = int
-type var = string
 
 type value
 and closure = code * env
 
 and instruction =
   | PUSH of value
-  | LOOKUP of var
+  | LOOKUP of Ast.var
   | UNARY of Ast.Unary_op.t
   | OPER of Ast.Binary_op.t
   | ASSIGN
   | SWAP
   | POP
-  | BIND of var
+  | BIND of Ast.var
   | FST
   | SND
   | DEREF
@@ -25,7 +24,7 @@ and instruction =
   | MK_INR
   | MK_REF
   | MK_CLOSURE of code
-  | MK_REC of var * code
+  | MK_REC of Ast.var * code
   | TEST of code * code
   | CASE of code * code
   | WHILE of code * code
@@ -38,7 +37,7 @@ type env_or_value = EV of env | V of value
 type env_value_stack = env_or_value list
 
 (* array of referenced values together with next unallocated address *)
-type state = value IntMap.t * int
+type state = value Int_map.t * int
 type interp_state = code * env_value_stack * state
 
 val step : interp_state -> interp_state

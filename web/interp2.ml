@@ -10,7 +10,7 @@ let rec driver state =
 
 let steps e =
   let c = Interp_2.compile e in
-  driver (c, [], (IntMap.empty, 0))
+  driver (c, [], (Int_map.empty, 0))
 
 let string_list_of_code code =
   List.map (Format.asprintf "%a" Interp_2.pp_instruction) code
@@ -19,7 +19,7 @@ let string_list_of_env env =
   List.map (Format.asprintf "%a" Interp_2.pp_env_or_value) env
 
 let list_of_map m =
-  List.of_seq @@ Seq.map (fun (_, v) -> v) @@ Interp_2.IntMap.to_seq m
+  List.of_seq @@ Seq.map (fun (_, v) -> v) @@ Interp_2.Int_map.to_seq m
 
 let string_list_of_heap (heap, _) =
   List.map (Format.asprintf "%a" Interp_2.pp_value) (list_of_map heap)
