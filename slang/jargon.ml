@@ -68,7 +68,7 @@ type instruction =
   | HALT
 [@@deriving show { with_path = false }]
 
-type listing = instruction list
+type code = instruction list
 
 type vm_state = {
   stack_bound : stack_index;
@@ -88,7 +88,7 @@ let stack_top vm = vm.stack.(vm.sp - 1)
 
 (********************** Printing ********************************)
 
-let rec pp_listing fmt : listing -> unit = function
+let rec pp_listing fmt : code -> unit = function
   | [] -> Format.fprintf fmt "\n"
   | LABEL l :: rest -> Format.fprintf fmt "\n%s: %a" l pp_listing rest
   | i :: rest -> Format.fprintf fmt "\n\t%a%a" pp_instruction i pp_listing rest
@@ -96,14 +96,14 @@ let rec pp_listing fmt : listing -> unit = function
 let pp_installed_code fmt (code, size) =
   let rec aux fmt k =
     if k < size then
-      Format.fprintf fmt "%d: %a\n%a" k pp_instruction code.(k) aux (k + 1)
+      Format.fprintf fmt "%d: %a@\n%a" k pp_instruction code.(k) aux (k + 1)
   in
   aux fmt 0
 
 let pp_stack fmt (sp, stack) =
   let rec aux fmt j =
     if j < sp then
-      Format.fprintf fmt "%d: %a\n%a" j pp_stack_item stack.(j) aux (j + 1)
+      Format.fprintf fmt "%d: %a@\n%a" j pp_stack_item stack.(j) aux (j + 1)
   in
   aux fmt 0
 
@@ -360,15 +360,13 @@ let assign vm =
         push (STACK_UNIT, vm))
       else
         { vm with status = Heap_index_out_of_bounds }
-  | _ -> Errors.complain "assing: runtime error, expecting heap index on stack"
+  | _ -> Errors.complain "assign: runtime error, expecting heap index on stack"
 
 let test (i, vm) =
-  pop
-    ( 1,
-      if stack_top vm = STACK_BOOL true then
-        advance_cp vm
-      else
-        { vm with cp = i } )
+  match stack_top vm with
+  | STACK_BOOL true -> advance_cp vm
+  | STACK_BOOL false -> goto (i, vm)
+  | _ -> Errors.complain "test: runtime error, expecting boolean on stack"
 
 let return vm =
   let current_fp = vm.fp in
@@ -474,7 +472,7 @@ let find y vmap =
   | Some v -> v
 
 (* put code listing into an array, associate an array index to each label *)
-let load (instr_list : listing) : instruction array * int =
+let load (instr_list : code) : instruction array * int =
   (* find array index for each label *)
   let mk_label_to_address l =
     let rec aux carry k = function
@@ -570,7 +568,7 @@ let positions l =
   in
   aux 1 l
 
-let rec comp vmap : Ast.t -> listing * listing = function
+let rec comp vmap : Ast.t -> code * code = function
   | Unit -> ([], [ PUSH STACK_UNIT ])
   | Boolean b -> ([], [ PUSH (STACK_BOOL b) ])
   | Integer n -> ([], [ PUSH (STACK_INT n) ])

@@ -76,22 +76,20 @@ val new_label : unit -> string
 val step : vm_state -> vm_state
 val driver : int -> vm_state -> vm_state
 
-type listing = instruction list
+type code = instruction list
 
-val comp :
-  (Past.var * value_path) list -> Ast.t -> instruction list * instruction list
-
-val compile : Ast.t -> listing
-val run : listing -> vm_state
+val comp : (Past.var * value_path) list -> Ast.t -> code * code
+val compile : Ast.t -> code
+val run : code -> vm_state
 val interpret : Ast.t -> vm_state
 val pp_stack_item : Format.formatter -> stack_item -> unit
 val pp_heap_item : Format.formatter -> heap_item -> unit
 val pp_status_code : Format.formatter -> status_code -> unit
 val pp_instruction : Format.formatter -> instruction -> unit
-val initial_state : listing -> vm_state
+val initial_state : code -> vm_state
 val first_frame : vm_state -> vm_state
 val pp_location : Format.formatter -> location -> unit
 val pp_value_path : Format.formatter -> value_path -> unit
 val pp_value : Format.formatter -> vm_state -> unit
 val reset : unit -> unit
-val pp_listing : Format.formatter -> listing -> unit
+val pp_listing : Format.formatter -> code -> unit
