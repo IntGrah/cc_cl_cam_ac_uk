@@ -137,7 +137,7 @@ let pp_state code fmt { cp; stack; heap } =
   Format.fprintf fmt "Code Pointer = %d -> %a@.Stack = %a@.Heap = %a@." cp
     pp_instruction code.(cp) pp_env_value_stack stack (Heap.pp pp_value) heap
 
-let step code ({ cp; stack; heap } as state : state) : state =
+let step code ({ cp; stack; heap } as state) : state =
   let advance = { state with cp = cp + 1 } in
   match (code.(cp), stack) with
   | PUSH v, evs -> { advance with stack = V v :: evs }

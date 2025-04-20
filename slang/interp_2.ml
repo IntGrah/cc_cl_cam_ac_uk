@@ -82,9 +82,9 @@ let rec evs_to_env : stack -> env = function
 
 (** val step : (code * env_value_stack * state) -> (code * env_value_stack *
     state) *)
-let step state =
+let step ({ code; stack; heap } as state) =
   let advance code stack = { state with code; stack } in
-  match (state.code, state.stack) with
+  match (code, stack) with
   | PUSH v :: ds, stack -> advance ds (V v :: stack)
   | POP :: ds, _ :: stack -> advance ds stack
   | SWAP :: ds, e1 :: e2 :: stack -> advance ds (e2 :: e1 :: stack)
@@ -106,10 +106,9 @@ let step state =
   | TEST (_, c2) :: ds, V (Bool false) :: stack -> advance (c2 @ ds) stack
   | ASSIGN :: ds, V v :: V (Ref a) :: stack ->
       { code = ds; stack = V Unit :: stack; heap = Heap.set a v state.heap }
-  | DEREF :: ds, V (Ref a) :: stack ->
-      advance ds (V (Heap.get a state.heap) :: stack)
+  | DEREF :: ds, V (Ref a) :: stack -> advance ds (V (Heap.get a heap) :: stack)
   | MK_REF :: ds, V v :: stack ->
-      let a, heap = Heap.alloc v state.heap in
+      let a, heap = Heap.alloc v heap in
       { code = ds; stack = V (Ref a) :: stack; heap }
   | WHILE (_, _) :: ds, V (Bool false) :: stack -> advance ds (V Unit :: stack)
   | WHILE (c1, c2) :: ds, V (Bool true) :: stack ->
@@ -121,7 +120,7 @@ let step state =
   | APPLY :: ds, V (Fun (Closure (c, env))) :: V v :: stack ->
       advance (c @ ds) (V v :: EV env :: stack)
   | APPLY :: ds, V (Fun (Rec_closure (f, (c, env)))) :: V v :: stack ->
-      advance ds
+      advance (APPLY :: ds)
         (V (Fun (Closure (c, (f, Fun (Rec_closure (f, (c, env)))) :: env)))
         :: V v :: stack)
   | _ -> Errors.complainf "step : bad state = %a" pp_state state
